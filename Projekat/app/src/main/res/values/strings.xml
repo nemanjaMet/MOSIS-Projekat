@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">Projekat</string>
+
+    <!-- Strings related to login -->
+    <string name="prompt_username">Username</string>
+    <string name="prompt_password">Password</string>
+    <string name="prompt_password2">Confirm password</string>
+    <string name="prompt_name">Name</string>
+    <string name="prompt_lastname">Last name</string>
+    <string name="prompt_phoneNumber">Phone number</string>
+    <string name="action_sign_in">Sign in</string>
+    <string name="action_register">Register</string>
+    <string name="action_createProfile">Create profile</string>
+    <string name="action_sign_in_short">Sign in SHORT TEST</string>
+    <string name="error_invalid_username">This username is invalid</string>
+    <string name="error_invalid_password">This password is invalid</string>
+    <string name="error_invalid_to_short_password">This password is too short</string>
+    <string name="error_invalid_password2">Confirm password is not correct</string>
+    <string name="error_incorrect_password">This password is incorrect</string>
+    <string name="error_field_required">This field is required</string>
+    <string name="title_activity_register">Register new profile</string>
+    <string name="text_imageLabel">Select avatar</string>
+    <!--<string name="permission_rationale">"Contacts permissions are needed for providing email
+        completions."
+    </string>-->
+</resources>
