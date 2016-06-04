@@ -1,0 +1,11 @@
+{
+  "name": "server",
+  "version": "1.0.1",
+  "dependencies": {
+    "body-parser": "^1.15.1",
+    "sqlite3": "*",
+    "express": "^4.13.4",
+    "express-ws": "^2.0.0-rc.1",
+    "socket.io": "^1.4.6"
+  }
+}

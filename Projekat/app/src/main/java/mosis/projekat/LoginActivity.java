@@ -3,6 +3,7 @@ package mosis.projekat;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
@@ -72,6 +73,7 @@ public class LoginActivity extends AppCompatActivity {
     private EditText mPasswordView;
     private View mProgressView;
     private View mLoginFormView;
+    String response = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,8 +81,9 @@ public class LoginActivity extends AppCompatActivity {
         setContentView(R.layout.activity_login);
         // Set up the login form.
         mUsernameView = (EditText) findViewById(R.id.username);
-
         mPasswordView = (EditText) findViewById(R.id.password);
+
+        // zakomentarisano radi testiranja glavne forme
         mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView textView, int id, KeyEvent keyEvent) {
@@ -97,6 +100,8 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 attemptLogin();
+                /*Intent i = new Intent(LoginActivity.this, MainActivity.class);
+                startActivity(i);*/
             }
         });
 
@@ -104,8 +109,10 @@ public class LoginActivity extends AppCompatActivity {
         registerButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
+                /*Intent i = new Intent(LoginActivity.this, RegisterActivity.class);
+                startActivity(i);*/
                 Intent i = new Intent(LoginActivity.this, RegisterActivity.class);
-                startActivity(i);
+                startActivityForResult(i, 1);
             }
         });
 
@@ -129,7 +136,7 @@ public class LoginActivity extends AppCompatActivity {
         mPasswordView.setError(null);
 
         // Store values at the time of the login attempt.
-        String email = mUsernameView.getText().toString();
+        String username = mUsernameView.getText().toString();
         String password = mPasswordView.getText().toString();
 
         boolean cancel = false;
@@ -143,7 +150,7 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         // Check for a valid email address.
-        if (TextUtils.isEmpty(email)) {
+        if (TextUtils.isEmpty(username)) {
             mUsernameView.setError(getString(R.string.error_field_required));
             focusView = mUsernameView;
             cancel = true;
@@ -161,7 +168,7 @@ public class LoginActivity extends AppCompatActivity {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
             showProgress(true);
-            mAuthTask = new UserLoginTask(email, password);
+            mAuthTask = new UserLoginTask(username, password);
             mAuthTask.execute((Void) null);
         }
     }
@@ -216,7 +223,7 @@ public class LoginActivity extends AppCompatActivity {
      * Represents an asynchronous login/registration task used to authenticate
      * the user.
      */
-    public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
+    public class UserLoginTask extends AsyncTask<Void, Void, String> {
 
         private final String mUsername;
         private final String mPassword;
@@ -227,39 +234,72 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         @Override
-        protected Boolean doInBackground(Void... params) {
+        protected String doInBackground(Void... params) {
             // TODO: attempt authentication against a network service.
-
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("username", mUsername ));
+            postParameters.add(new BasicNameValuePair("password", mPassword ));
+            String res = null;
             try {
-                // Simulate network access.
+                // Simulate network access. //
+                response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_checkuser", postParameters);
+                res=response.toString();
+                res = res.trim();
+                //res= res.replaceAll("\\s+","");
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
-                return false;
+                //return false;
+                return "Error";
+            } catch (Exception e) {
+                e.printStackTrace();
+                //return false;
+                return "Error";
             }
 
-            for (String credential : DUMMY_CREDENTIALS) {
+           /* for (String credential : DUMMY_CREDENTIALS) {
                 String[] pieces = credential.split(":");
                 if (pieces[0].equals(mUsername)) {
                     // Account exists, return true if the password matches.
                     return pieces[1].equals(mPassword);
                 }
-            }
+            }*/
 
             // TODO: register the new account here.
-            return true;
+            return res;
         }
 
         @Override
-        protected void onPostExecute(final Boolean success) {
+        protected void onPostExecute(String result) {
             mAuthTask = null;
             showProgress(false);
 
-            if (success) {
+            if (result.equals("correct"))
+            {
+                // otvaranje glavne forme
+                /*Intent i = new Intent(LoginActivity.this, MainActivity.class);
+                startActivity(i);*/
+                // slanje username-a glavnoj formi
+                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                intent.putExtra("username", mUsernameView.getText().toString());
+                startActivity(intent);
+            }
+            else if (result.equals("passwErr"))
+            {
+                mPasswordView.setError(getString(R.string.error_incorrect_password));
+                mPasswordView.requestFocus();
+            }
+            else
+            {
+                mUsernameView.setError(getString(R.string.error_invalid_username));
+                mUsernameView.requestFocus();
+            }
+
+            /*if (success) {
                 finish();
             } else {
                 mPasswordView.setError(getString(R.string.error_incorrect_password));
                 mPasswordView.requestFocus();
-            }
+            }*/
         }
 
         @Override
@@ -269,26 +309,34 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    public void postData() {
-        // Create a new HttpClient and Post Header
-        HttpClient httpclient = new DefaultHttpClient();
-        HttpPost httppost = new HttpPost("http://www.yoursite.com/script.php");
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
-        try {
-            // Add your data
-            List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(2);
-            nameValuePairs.add(new BasicNameValuePair("id", "12345"));
-            nameValuePairs.add(new BasicNameValuePair("stringdata", "Hi"));
-            httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+        if (requestCode == 1) {
+            if(resultCode == Activity.RESULT_OK){
+                // primanje usernema
+                String result = data.getStringExtra("result");
+                result = result.trim();
+                if (!result.isEmpty())
+                {
+                    Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                    intent.putExtra("username", result);
+                    startActivity(intent);
+                }
 
-            // Execute HTTP Post Request
-            HttpResponse response = httpclient.execute(httppost);
-
-        } catch (ClientProtocolException e) {
-            // TODO Auto-generated catch block
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
+                // primanje objekta User
+               /* Bundle bundle = data.getExtras();
+                if (bundle != null) {
+                    User user = (User) bundle.getSerializable("result");
+                   // User user = (User) getIntent().getSerializableExtra("result");
+                    //Integer beta = 0;
+                }*/
+            }
+            if (resultCode == Activity.RESULT_CANCELED) {
+                //Write your code if there's no result
+            }
         }
-    }
+    }//onActivityResult*/
+
 }
 

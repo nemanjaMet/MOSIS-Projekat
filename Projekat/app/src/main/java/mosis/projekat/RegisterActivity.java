@@ -1,7 +1,14 @@
 package mosis.projekat;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.annotation.TargetApi;
+import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.database.Cursor;
@@ -10,22 +17,36 @@ import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.Toast;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 
 public class RegisterActivity extends AppCompatActivity {
 
     private static final int SELECT_PICTURE = 100;
     private ImageButton selectImage;
+    private Bitmap bitmap = null;
     private EditText et_username;
     private EditText et_password;
     private EditText et_password2;
     private EditText et_name;
     private EditText et_lastname;
     private EditText et_phonenumber;
+    private UserLoginTask mAuthTask = null;
+    String response = null;
+    private View mRegisterFormView;
+    private View mProgressView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +63,9 @@ public class RegisterActivity extends AppCompatActivity {
         et_name = (EditText) findViewById(R.id.name_register);
         et_lastname = (EditText) findViewById(R.id.lastname_register);
         et_phonenumber = (EditText) findViewById(R.id.phoneNumber_register);
+
+        mRegisterFormView = findViewById(R.id.register_form);
+        mProgressView = findViewById(R.id.register_progress);
 
         /*FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -86,9 +110,16 @@ public class RegisterActivity extends AppCompatActivity {
                 if (null != selectedImageUri) {
                     // Get the path from the Uri
                     String path = getPathFromURI(selectedImageUri);
-                    //Log.i(TAG, "Image Path : " + path);
                     // Set the image in ImageView
-                    selectImage.setImageURI(selectedImageUri);
+                   // selectImage.setImageURI(selectedImageUri); RADI I OVAKO
+                    try {
+                        //Getting the Bitmap from Gallery
+                        bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), selectedImageUri);
+                        //Setting the Bitmap to ImageView
+                        selectImage.setImageBitmap(bitmap);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -148,20 +179,179 @@ public class RegisterActivity extends AppCompatActivity {
             cancel = true;
         }
 
+        if (bitmap == null)
+        {
+           // Toast.makeText(RegisterActivity.this, "Select your avatar!", Toast.LENGTH_SHORT).show();
+            cancel = true;
+        }
+
 
         if (cancel) {
             // There was an error; don't attempt login and focus the first
             // form field with an error.
-            focusView.requestFocus();
+            if (focusView != null)
+                focusView.requestFocus();
+            else
+                Toast.makeText(RegisterActivity.this, "Select your avatar!", Toast.LENGTH_SHORT).show();
         } else {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
+            User user = new User(username, password);
+            user.setName(name);
+            user.setLastName(lastName);
+            user.setPhoneNumber(phoneNumber);
+            user.setImage(bitmap);
 
+            //Intent returnIntent = new Intent();
+            //returnIntent.putExtra("result", user);
+            /*Bundle mBundle = new Bundle();
+            mBundle.putSerializable("result",user);
+            returnIntent.putExtras(mBundle);*/
+           // setResult(Activity.RESULT_OK,returnIntent);
+            //finish();
+            showProgress(true);
+            mAuthTask = new UserLoginTask(user);
+            mAuthTask.execute((Void) null);
         }
     }
 
     private boolean isPasswordValid(String password) {
         //TODO: Replace this with your own logic
         return password.length() > 4;
+    }
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
+    private void showProgress(final boolean show) {
+        // On Honeycomb MR2 we have the ViewPropertyAnimator APIs, which allow
+        // for very easy animations. If available, use these APIs to fade-in
+        // the progress spinner.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
+            int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
+
+            mRegisterFormView.setVisibility(show ? View.GONE : View.VISIBLE);
+            mRegisterFormView.animate().setDuration(shortAnimTime).alpha(
+                    show ? 0 : 1).setListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    mRegisterFormView.setVisibility(show ? View.GONE : View.VISIBLE);
+                }
+            });
+
+            mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
+            mProgressView.animate().setDuration(shortAnimTime).alpha(
+                    show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
+                }
+            });
+        } else {
+            // The ViewPropertyAnimator APIs are not available, so simply show
+            // and hide the relevant UI components.
+            mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
+            mRegisterFormView.setVisibility(show ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /**
+     * Represents an asynchronous login/registration task used to authenticate
+     * the user.
+     */
+    public class UserLoginTask extends AsyncTask<Void, Void, String> {
+
+        private final User user;
+
+        UserLoginTask(User mUser) {
+            user = mUser;
+        }
+
+        @Override
+        protected String doInBackground(Void... params) {
+            // TODO: attempt authentication against a network service.
+            String stringImage = getStringImage(user.getImage());
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("username", user.getUsername() ));
+            postParameters.add(new BasicNameValuePair("password", user.getPassword() ));
+            postParameters.add(new BasicNameValuePair("name", user.getName() ));
+            postParameters.add(new BasicNameValuePair("lastname", user.getLastname() ));
+            postParameters.add(new BasicNameValuePair("phonenumber", user.getPhoneNumber() ));
+            postParameters.add(new BasicNameValuePair("image", stringImage ));
+            String res = null;
+            try {
+                // Simulate network access. //127.0.0.1:8081
+                response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_newuser", postParameters);
+                res=response.toString();
+                res = res.trim();
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                return "Error";
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "Error";
+            }
+
+            // TODO: register the new account here.
+            return res;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            mAuthTask = null;
+            showProgress(false);
+
+            if (result.equals("success"))
+            {
+                // otvaranje glavne forme
+                /*Intent i = new Intent(RegisterActivity.this, MainActivity.class);
+                startActivity(i);*/
+                // slanje samo username-a
+                Intent returnIntent = new Intent();
+                returnIntent.putExtra("result", et_username.getText().toString());
+                setResult(Activity.RESULT_OK,returnIntent);
+                finish();
+                // slanje objekta
+               /* Intent returnIntent = new Intent();
+                returnIntent.putExtra("result", user);
+                Bundle mBundle = new Bundle();
+                mBundle.putSerializable("result",user);
+                returnIntent.putExtras(mBundle);
+                setResult(Activity.RESULT_OK,returnIntent);
+                finish();*/
+            }
+            else if (result.equals("userErr"))
+            {
+                et_username.setError(getString(R.string.error_username_already_taken));
+                et_username.requestFocus();
+                //mPasswordView.setError(getString(R.string.error_incorrect_password));
+                //mPasswordView.requestFocus();
+            }
+            else
+            {
+                Toast.makeText(RegisterActivity.this, "Error on sending data! Check internet connection.", Toast.LENGTH_SHORT).show();
+                //mUsernameView.setError(getString(R.string.error_invalid_username));
+                //mUsernameView.requestFocus();
+            }
+
+        }
+
+        @Override
+        protected void onCancelled() {
+            mAuthTask = null;
+            showProgress(false);
+        }
+    }
+
+    /*public static byte[] getBitmapAsByteArray(Bitmap bitmap) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 0, outputStream);
+        return outputStream.toByteArray();
+    }*/
+
+    public String getStringImage(Bitmap bmp){
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+        byte[] imageBytes = baos.toByteArray();
+        String encodedImage = Base64.encodeToString(imageBytes, Base64.DEFAULT);
+        return encodedImage;
     }
 }
