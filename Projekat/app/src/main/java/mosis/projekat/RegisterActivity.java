@@ -6,6 +6,7 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -14,15 +15,19 @@ import android.provider.MediaStore;
 import android.database.Cursor;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.design.widget.TextInputLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.apache.http.NameValuePair;
@@ -30,7 +35,10 @@ import org.apache.http.message.BasicNameValuePair;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 public class RegisterActivity extends AppCompatActivity {
 
@@ -47,6 +55,7 @@ public class RegisterActivity extends AppCompatActivity {
     String response = null;
     private View mRegisterFormView;
     private View mProgressView;
+    ProjekatDBAdapter dbAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,20 +86,68 @@ public class RegisterActivity extends AppCompatActivity {
         });*/
 
         selectImage = (ImageButton)findViewById(R.id.imageButton);
-        selectImage.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View view) {
-                openImageChooser();
-            }
-        });
+
 
         Button registerButton = (Button) findViewById(R.id.createProfile_button);
-        registerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                attemptCreateProfile();
-            }
-        });
+
+
+        dbAdapter = new ProjekatDBAdapter(getApplicationContext());
+        Bundle p = getIntent().getExtras();
+        if (p != null)
+        {
+            String friendUsername =p.getString("friendUsername");
+            dbAdapter.open();
+            User friend = dbAdapter.getEntry(friendUsername);
+            dbAdapter.close();
+            friend.setLongitude(String.valueOf(p.getDouble("longitude")));
+            friend.setLatitude(String.valueOf(p.getDouble("latitude")));
+
+            TextView selectAvatar = (TextView)findViewById(R.id.imageLabel);
+            selectAvatar.setVisibility(View.INVISIBLE);
+            et_username.setEnabled(false);
+            et_username.setFocusable(false);
+            et_password.setHint(R.string.hint_longitude);
+            et_password.setEnabled(false);
+            et_password.setFocusable(false);
+            et_password.setInputType(InputType.TYPE_CLASS_TEXT);
+            et_password2.setEnabled(false);
+            et_password2.setFocusable(false);
+            et_password2.setInputType(InputType.TYPE_CLASS_TEXT);
+            et_password2.setHint("Latitude");
+            et_name.setEnabled(false);
+            et_name.setFocusable(false);
+            et_lastname.setEnabled(false);
+            et_lastname.setFocusable(false);
+            et_phonenumber.setEnabled(false);
+            et_phonenumber.setFocusable(false);
+            registerButton.setVisibility(View.INVISIBLE);
+
+            et_username.setText(friendUsername);
+            et_password.setText(friend.getLongitude());
+            et_password2.setText(friend.getLatitude());
+            et_name.setText(friend.getName());
+            et_lastname.setText(friend.getLastname());
+            et_phonenumber.setText(friend.getPhoneNumber());
+
+            bitmap = StringToBitMap(friend.getImage());
+            //Setting the Bitmap to ImageView
+            selectImage.setImageBitmap(bitmap);
+        }
+        else
+        {
+            registerButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    attemptCreateProfile();
+                }
+            });
+            selectImage.setOnClickListener(new View.OnClickListener(){
+                @Override
+                public void onClick(View view) {
+                    openImageChooser();
+                }
+            });
+        }
 
     }
 
@@ -196,12 +253,16 @@ public class RegisterActivity extends AppCompatActivity {
         } else {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
-            User user = new User(username, password);
+            String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
+            User user = new User(username);
+            user.setPassword(password);
             user.setName(name);
             user.setLastName(lastName);
             user.setPhoneNumber(phoneNumber);
-            user.setImage(bitmap);
-
+            //user.setImage(bitmap);
+            String image = getStringImage(bitmap);
+            user.setImage(image);
+            user.setCreated(mydate);
             //Intent returnIntent = new Intent();
             //returnIntent.putExtra("result", user);
             /*Bundle mBundle = new Bundle();
@@ -268,17 +329,20 @@ public class RegisterActivity extends AppCompatActivity {
         @Override
         protected String doInBackground(Void... params) {
             // TODO: attempt authentication against a network service.
-            String stringImage = getStringImage(user.getImage());
+            //String stringImage = getStringImage(user.getImage());
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("username", user.getUsername() ));
             postParameters.add(new BasicNameValuePair("password", user.getPassword() ));
             postParameters.add(new BasicNameValuePair("name", user.getName() ));
             postParameters.add(new BasicNameValuePair("lastname", user.getLastname() ));
             postParameters.add(new BasicNameValuePair("phonenumber", user.getPhoneNumber() ));
-            postParameters.add(new BasicNameValuePair("image", stringImage ));
+            //postParameters.add(new BasicNameValuePair("image", stringImage ));
+            postParameters.add(new BasicNameValuePair("image", user.getImage()));
+            postParameters.add(new BasicNameValuePair("created", user.getCreated() ));
             String res = null;
             try {
-                // Simulate network access. //127.0.0.1:8081
+                // Simulate network access. //http://192.168.0.103:8081/process_newuser
+                // 192.168.137.79:8081
                 response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_newuser", postParameters);
                 res=response.toString();
                 res = res.trim();
@@ -353,5 +417,28 @@ public class RegisterActivity extends AppCompatActivity {
         byte[] imageBytes = baos.toByteArray();
         String encodedImage = Base64.encodeToString(imageBytes, Base64.DEFAULT);
         return encodedImage;
+    }
+
+    public Bitmap StringToBitMap(String encodedString) {
+        try {
+            byte[] encodeByte = Base64.decode(encodedString, Base64.DEFAULT);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(encodeByte, 0,
+                    encodeByte.length);
+            return bitmap;
+        } catch (Exception e) {
+            e.getMessage();
+            return null;
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                onBackPressed();
+                return true;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 }

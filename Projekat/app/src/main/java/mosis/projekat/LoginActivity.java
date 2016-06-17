@@ -30,6 +30,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -241,7 +242,8 @@ public class LoginActivity extends AppCompatActivity {
             postParameters.add(new BasicNameValuePair("password", mPassword ));
             String res = null;
             try {
-                // Simulate network access. //
+                // Simulate network access. // http://192.168.0.103:8081/process_checkuser
+                // 192.168.137.79:8081
                 response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_checkuser", postParameters);
                 res=response.toString();
                 res = res.trim();
@@ -282,16 +284,21 @@ public class LoginActivity extends AppCompatActivity {
                 Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                 intent.putExtra("username", mUsernameView.getText().toString());
                 startActivity(intent);
+                finish();
             }
             else if (result.equals("passwErr"))
             {
                 mPasswordView.setError(getString(R.string.error_incorrect_password));
                 mPasswordView.requestFocus();
             }
-            else
+            else if (result.equals("usernErr"))
             {
                 mUsernameView.setError(getString(R.string.error_invalid_username));
                 mUsernameView.requestFocus();
+            }
+            else // Taost
+            {
+                Toast.makeText(getApplicationContext(), "Problem with connection!", Toast.LENGTH_SHORT).show();
             }
 
             /*if (success) {
@@ -322,6 +329,7 @@ public class LoginActivity extends AppCompatActivity {
                     Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                     intent.putExtra("username", result);
                     startActivity(intent);
+                    finish();
                 }
 
                 // primanje objekta User

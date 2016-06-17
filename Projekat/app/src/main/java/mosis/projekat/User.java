@@ -1,7 +1,6 @@
 package mosis.projekat;
 
 import android.graphics.Bitmap;
-import android.media.Image;
 
 import java.io.Serializable;
 
@@ -10,83 +9,123 @@ import java.io.Serializable;
  */
 public class User implements Serializable {
     long ID;
-    String username;
-    String password;
-    String name;
-    String lastname;
-    String phoneNumber;
-    Bitmap image;
+    String Username;
+    String Password;
+    String Name;
+    String Lastname;
+    String PhoneNumber;
+    //Bitmap Image;
+    String Image;
+    String Created;
+    String Longitude;
+    String Latitude;
 
     private static final long serialVersionUID = 1L;
 
-    public User(String username, String password)
+    public User()
     {
-        this.username = username;
-        this.password = password;
-        this.name = "";
-        this.lastname = "";
-        this.phoneNumber = "";
-        //this.image = null;
+        this.Username = "";
+        this.Password = "";
+        this.Name = "";
+        this.Lastname = "";
+        this.PhoneNumber = "";
+        //this.Image = null;
+        this.Image = "";
+        this.Created = "";
+        this.Longitude = "";
+        this.Latitude = "";
+    }
+
+    public User(String username)
+    {
+        this.Username = username;
+        this.Password = "";
+        this.Name = "";
+        this.Lastname = "";
+        this.PhoneNumber = "";
+        //this.Image = null;
+        this.Image = "";
+        this.Created = "";
     }
 
     public void setUsername(String username)
     {
-        this.username = username;
+        this.Username = username;
     }
 
     public String getUsername()
     {
-        return username;
+        return Username;
     }
 
     public void setPassword(String password)
     {
-        this.password = password;
+        this.Password = password;
     }
 
     public String getPassword()
     {
-        return password;
+        return Password;
     }
 
     public void setName(String name)
     {
-        this.name = name;
+        this.Name = name;
     }
 
     public String getName()
     {
-        return name;
+        return Name;
     }
 
     public void setLastName(String lastname)
     {
-        this.lastname = lastname;
+        this.Lastname = lastname;
     }
 
     public String getLastname()
     {
-        return lastname;
+        return Lastname;
     }
 
     public void setPhoneNumber(String phoneNumber)
     {
-        this.phoneNumber = phoneNumber;
+        this.PhoneNumber = phoneNumber;
     }
 
     public String getPhoneNumber()
     {
-        return phoneNumber;
+        return PhoneNumber;
     }
 
-    public void setImage(Bitmap image)
+    /*public void setImage(Bitmap image)
     {
-        this.image = image;
+        this.Image = image;
     }
 
     public Bitmap getImage()
     {
-        return image;
+        return Image;
+    }*/
+
+    public void setImage(String image)
+    {
+        this.Image = image;
+    }
+
+    public String getImage()
+    {
+        return Image;
+    }
+
+    public void setCreated(String created)
+    {
+        this.Created = created;
+    }
+
+    public String getCreated()
+    {
+        return this.Created;
     }
 
     public long getID(){
@@ -95,5 +134,25 @@ public class User implements Serializable {
 
     public void setID(long ID){
         this.ID = ID;
+    }
+
+    public void setLongitude(String longitude)
+    {
+        this.Longitude = longitude;
+    }
+
+    public String getLongitude()
+    {
+        return this.Longitude;
+    }
+
+    public void setLatitude(String latitude)
+    {
+        this.Latitude = latitude;
+    }
+
+    public String getLatitude()
+    {
+        return this.Latitude;
     }
 }

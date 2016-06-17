@@ -32,11 +32,12 @@
         <activity
             android:name=".RegisterActivity"
             android:label="@string/title_activity_register"
-            android:parentActivityName=".LoginActivity"
             android:theme="@style/AppTheme.NoActionBar">
+           <!-- android:parentActivityName=".LoginActivity"
+
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
-                android:value=".LoginActivity" />
+                android:value=".LoginActivity" /> -->
         </activity>
 
         <meta-data
