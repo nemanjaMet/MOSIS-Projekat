@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/previus_question"
+        app:showAsAction="never"
+        android:title="Previus question">
+    </item>
+    <item
+        android:id="@+id/next_question"
+        app:showAsAction="never"
+        android:title="Next question">
+    </item>
+</menu>

@@ -3,26 +3,30 @@ package mosis.projekat;
 import android.Manifest;
 import android.app.Activity;
 import android.app.Dialog;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.location.Criteria;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.media.ThumbnailUtils;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.util.ArrayMap;
+import android.support.v7.app.AlertDialog;
 import android.util.Base64;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -45,43 +49,39 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.google.gson.annotations.SerializedName;
 
-import java.io.IOException;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback,  com.google.android.gms.location.LocationListener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
+    private String ipAddress = "http://192.168.137.174:8081";
     private UpdateLocTask mAuthTask = null;
     String response = null;
     SupportMapFragment sMapFragment;
     private LatLng myLoc;
+    private LatLng categoryLatLng;
+    private LatLng questionLatLng;
     private GoogleMap mMap;
     private String myUsername;
     private String friendsUsernames = "";
@@ -97,6 +97,13 @@ public class MainActivity extends AppCompatActivity
     //private ArrayList<User> friendsAvatar;
     private ArrayMap<String, Bitmap> friendsAvatar;
     private ArrayList<Marker> friendsMarkers;
+    private int numberOfQuestion = 5;
+    private int questionNumber = 0;
+    Questions questions;
+    private View mCustomMarkerView;
+    private ImageView mMarkerImageView;
+    private String ImageUrl = "";
+    private Circle mCircle;
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -109,20 +116,86 @@ public class MainActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        ///////////////////
+        mCustomMarkerView = ((LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(R.layout.view_custom_marker, null);
+        mMarkerImageView = (ImageView) mCustomMarkerView.findViewById(R.id.profile_image);
+        //////////////////
+
         sMapFragment = SupportMapFragment.newInstance();
 
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        /*FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                /*Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show();*/
+                if (questionNumber == 0)
+                {
+                    // Select category and number of question
+                    Intent i = new Intent(MainActivity.this, QuestionActivity.class);
+                    i.putExtra("questionNumber", Integer.toString(questionNumber));
+                    startActivityForResult(i, 1);
+                    categoryLatLng = myLoc;
+                }
+                else if ((questionNumber - 1 )< numberOfQuestion)
+                {
+                        // Next question
+                    questionLatLng = myLoc;
+                    float meters[] = new float[1];
+                    Location.distanceBetween(categoryLatLng.latitude, categoryLatLng.longitude, questionLatLng.latitude, questionLatLng.longitude, meters);
+                    if (meters[0] < 250.0)
+                    {
+                        // moze da se postavi pitanja
+                        Intent i = new Intent(MainActivity.this, QuestionActivity.class);
+                        i.putExtra("questionNumber", Integer.toString(questionNumber));
+                        i.putExtra("numberOfQuestion", Integer.toString(numberOfQuestion));
+                        i.putExtra("spinnerCategory", questions.getCategory());
+                        startActivityForResult(i, 1);
+                    }
+                }
+                else
+                {
+                    // SEND DATA TO SERVER
+
+                    AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                            .setMessage("Send questions to server ?")
+                            .setCancelable(false)
+                            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which)
+                                {
+                                    // Perform Your Task Here--When Yes Is Pressed.
+                                    //Toast.makeText(MainActivity.this, "Sending data....", Toast.LENGTH_SHORT).show();
+                                    //dialog.cancel();
+                                    Intent i = new Intent(MainActivity.this, QuestionActivity.class);
+                                    i.putExtra("questionNumber", Integer.toString(questionNumber));
+                                    i.putExtra("numberOfQuestion", Integer.toString(numberOfQuestion));
+                                    i.putExtra("category", questions.getCategory());
+                                    i.putExtra("questions", questions.getQuestions());
+                                    i.putExtra("correctAnswers", questions.getCorrectAnswers());
+                                    i.putExtra("wrongAnswers", questions.getWrongAnswers());
+                                    i.putExtra("longitudeLatitude", questions.getLongitudeLatitude());
+                                    //i.putExtra("categoryLongLat", questions.getCategoryLongLat());
+                                    i.putExtra("categoryLong", questions.getLongitudeCategory());
+                                    i.putExtra("categoryLat", questions.getLatitudeCategory());
+                                    i.putExtra("createdUser", questions.getCreatedUser());
+                                    i.putExtra("friendsUsernames", friendsUsernames);
+                                    startActivityForResult(i, 1);
+                                }
+                            })
+                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which)
+                                {
+                                    // Perform Your Task Here--When No is pressed
+                                    dialog.cancel();
+                                }
+                            }).show();
+                }
             }
-        });*/
+        });
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -263,7 +336,7 @@ public class MainActivity extends AppCompatActivity
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
-        //nemco probaj ovde da napravis da hajduje mapicku!!
+
         return true;
     }
 
@@ -276,6 +349,10 @@ public class MainActivity extends AppCompatActivity
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            GetCategoryTask mCategoryTask;
+            mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, Double.toString(myLoc.longitude), Double.toString(myLoc.latitude));
+            //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+            mCategoryTask.execute();
             return true;
         }
 
@@ -518,8 +595,8 @@ public class MainActivity extends AppCompatActivity
             String res = null;
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_updatelocation
-                // 192.168.137.79:8081
-                response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_updatelocation", postParameters);
+                // 192.168.1.73:8081
+                response = CustomHttpClient.executeHttpPost(ipAddress + "/process_updatelocation", postParameters);
                 res=response.toString();
                 res = res.trim();
                 //Thread.sleep(2000);
@@ -539,7 +616,7 @@ public class MainActivity extends AppCompatActivity
         protected void onPostExecute(String result) {
             mAuthTask = null;
 
-            if (!result.equals("nofriends"))
+            if (!result.equals("noFriends"))
             {
                 // Update-lokacije prijatelja
                 if (!friendsAvatar.isEmpty()) // Mozda pukne ako friendsAvatars nije inic.
@@ -571,31 +648,35 @@ public class MainActivity extends AppCompatActivity
                         }
 
                         if (!markerPostoji) {
+
                             Bitmap thumbnail = ThumbnailUtils.extractThumbnail(((Bitmap) friendsAvatar.get(friendsLocation.get(i).getUsername())), 50, 50);
                             if (thumbnail != null) {
                                 Double lat = Double.parseDouble(friendsLocation.get(i).getLatitude());
                                 Double lon = Double.parseDouble(friendsLocation.get(i).getLongitude());
-                                LatLng friendPosition = new LatLng(lat, lon);
+                                final LatLng friendPosition = new LatLng(lat, lon);
                                 Marker friendMarker = mMap.addMarker(new MarkerOptions()
                                         .position(friendPosition)
                                         .title(friendsLocation.get(i).getUsername())
                                         //.snippet("Latitude: " + friendsLocation.get(i).getLatitude() + "\n" + "Longitude: " + friendsLocation.get(i).getLongitude())
                                         //.icon(BitmapDescriptorFactory.fromBitmap((Bitmap) friendsAvatar.get("user2"))));
-                                        .icon(BitmapDescriptorFactory.fromBitmap(thumbnail)));
+                                        //.icon(BitmapDescriptorFactory.fromBitmap(thumbnail)));
+                                        .icon(BitmapDescriptorFactory.fromBitmap(getMarkerBitmapFromView(mCustomMarkerView, thumbnail))));
                                 mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
                                     @Override
                                     public boolean onMarkerClick(Marker marker) {
                                         //Toast.makeText(MainActivity.this,marker.getTitle(),Toast.LENGTH_LONG).show();
-                                        Intent i = new Intent(MainActivity.this, RegisterActivity.class);
+                                        Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
                                         //i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                                        i.putExtra("friendUsername", marker.getTitle());
-                                        i.putExtra("longitude",marker.getPosition().longitude);
-                                        i.putExtra("latitude", marker.getPosition().latitude);
-                                        startActivity(i);
+                                        intent.putExtra("friendUsername", marker.getTitle());
+                                        intent.putExtra("longitude",marker.getPosition().longitude);
+                                        intent.putExtra("latitude", marker.getPosition().latitude);
+                                        startActivity(intent);
                                         return false;
                                     }
                                 }); // PUCA !!!!!!!!!!
                                 friendsMarkers.add(friendMarker);
+
+
                             /*mMap.setOnMapClickListener(new GoogleMap.OnMarkerClickListener()
                             {
                                 @Override
@@ -635,11 +716,11 @@ public class MainActivity extends AppCompatActivity
             // TODO: attempt authentication against a network service.
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("username", mUsername ));
-            String res = null;
+            String resCheckFriends = null;
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_getfriendship
                 // 192.168.137.79:8081
-                res = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_getfriendship", postParameters);
+                resCheckFriends = CustomHttpClient.executeHttpPost(ipAddress + "/process_getfriendship", postParameters);
                 /*res=response.toString();
                 res = res.trim();*/
                 //Thread.sleep(2000);
@@ -652,7 +733,7 @@ public class MainActivity extends AppCompatActivity
                 return "Error";
             }
 
-            return res;
+            return resCheckFriends;
         }
 
         @Override
@@ -660,7 +741,7 @@ public class MainActivity extends AppCompatActivity
            // mAuthTask = null;
 
             result = result.trim();
-            if (!result.equals("nofriends"))
+            if (!result.equals("noFriends"))
             {
                 if (result.contains("Username")) {
                     friendsMarkers = new ArrayList<Marker>();
@@ -806,11 +887,11 @@ public class MainActivity extends AppCompatActivity
             // TODO: attempt authentication against a network service.
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("username", mUsername ));
-            String res = null;
+            String resFriendProfile = null;
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_checkuser
                 // 192.168.137.79:8081
-                res = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_getFriendProfile", postParameters);
+                resFriendProfile = CustomHttpClient.executeHttpPost(ipAddress + "/process_getFriendProfile", postParameters);
                 /*res=response.toString();
                 res = res.trim();*/
                 //Thread.sleep(100);
@@ -822,7 +903,7 @@ public class MainActivity extends AppCompatActivity
             }
 
             //return response;
-            return res;
+            return resFriendProfile;
         }
 
         @Override
@@ -867,6 +948,231 @@ public class MainActivity extends AppCompatActivity
         } catch (Exception e) {
             e.getMessage();
             return null;
+        }
+    }
+
+   private Bitmap getMarkerBitmapFromView(View view, Bitmap bitmap) {
+
+        mMarkerImageView.setImageBitmap(bitmap);
+        view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+        view.buildDrawingCache();
+        Bitmap returnedBitmap = Bitmap.createBitmap(view.getMeasuredWidth(), view.getMeasuredHeight(),
+                Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(returnedBitmap);
+        canvas.drawColor(Color.WHITE, PorterDuff.Mode.SRC_IN);
+        Drawable drawable = view.getBackground();
+        if (drawable != null)
+            drawable.draw(canvas);
+        view.draw(canvas);
+        return returnedBitmap;
+    }
+
+    // za CIRCLE oko objekta PERIN kod !
+    private void drawCircle(LatLng position, double radiusInMeters){
+        //podesena vrednost za radius i za boje
+        //double radiusInMeters = 500.0;
+        int strokeColor = 0x0000FF; // obod radijusa
+        int shadeColor = 0x44F0FFFF; //pozadina radijusa, 44 oznacava providnost!!
+
+        CircleOptions circleOptions = new CircleOptions().center(position).radius(radiusInMeters).fillColor(shadeColor)
+                .strokeColor(strokeColor).strokeWidth(2);
+        mCircle = mMap.addCircle(circleOptions);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == 1) {
+            if (resultCode == Activity.RESULT_FIRST_USER)
+            {
+                questionNumber = Integer.parseInt(data.getStringExtra("questionNumber").trim());
+                String spinnerSelection = data.getStringExtra("spinnerCategory").trim();
+                numberOfQuestion = Integer.parseInt(data.getStringExtra("numberOfQuestion").trim());
+                questions = new Questions();
+                questions.setCategory(spinnerSelection);
+                questions.setCreatedUser(myUsername);
+                //questions.setCategoryLongLat(Double.toString(categoryLatLng.longitude) + "," + Double.toString(categoryLatLng.latitude));
+                questions.setLongitudeCategory(Double.toString(categoryLatLng.longitude));
+                questions.setLatitudeCategory(Double.toString(categoryLatLng.latitude));
+                drawCircle(categoryLatLng, 250.0);
+                Toast.makeText(MainActivity.this, "Post questions on desired locations, near this location... ", Toast.LENGTH_LONG).show();
+            }
+            else if(resultCode == Activity.RESULT_OK){
+                if (questions.Questions.isEmpty())
+                {
+                    questionNumber = Integer.parseInt(data.getStringExtra("questionNumber").trim());
+                    questions.setQuestions(data.getStringExtra("question"));
+                    questions.setCorrectAnswers(data.getStringExtra("correctAnswer"));
+                    questions.setWrongAnswers(data.getStringExtra("wrongAnswer"));
+                    questions.setLongitudeLatitude(Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.longitude));
+                }
+                else
+                {
+                    String separate = "&&";
+                    questionNumber = Integer.parseInt(data.getStringExtra("questionNumber").trim());
+                    questions.setQuestions(questions.getQuestions() + separate + data.getStringExtra("question"));
+                    questions.setCorrectAnswers(questions.getCorrectAnswers() + separate + data.getStringExtra("correctAnswer"));
+                    questions.setWrongAnswers(questions.getWrongAnswers() + separate + data.getStringExtra("wrongAnswer"));
+                    questions.setLongitudeLatitude(questions.getLongitudeLatitude() + separate + Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.longitude));
+                }
+
+                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+
+                Marker friendMarker = mMap.addMarker(new MarkerOptions()
+                            .position(questionLatLng)
+                            .title(Integer.toString(questionNumber-1))
+                            .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                    mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+                        @Override
+                        public boolean onMarkerClick(Marker marker) {
+                            Intent i = new Intent(MainActivity.this, QuestionActivity.class);
+                            i.putExtra("question", questions.getQuestions());
+                            i.putExtra("correctAnswer", questions.getCorrectAnswers());
+                            i.putExtra("wrongAnswer", questions.getWrongAnswers());
+                            i.putExtra("questionClicked", marker.getTitle());
+                            i.putExtra("questionNumber", Integer.toString(questionNumber));
+                            i.putExtra("numberOfQuestion", Integer.toString(numberOfQuestion));
+                            i.putExtra("spinnerCategory", questions.getCategory());
+                            startActivityForResult(i, 1);
+                            return false;
+                        }
+                    });
+
+                /*BitmapDescriptor icon = BitmapDescriptorFactory.fromResource(R.drawable.ic_question_marker);
+                mMap.addMarker(new MarkerOptions().position(questionLatLng).title(Integer.toString(questionNumber-1)).icon(icon)).showInfoWindow();*/
+
+                // primanje objekta User
+               /* Bundle bundle = data.getExtras();
+                if (bundle != null) {
+                    User user = (User) bundle.getSerializable("result");
+                   // User user = (User) getIntent().getSerializableExtra("result");
+                    //Integer beta = 0;
+                }*/
+            }
+            else if (resultCode == 3) {
+                String status = data.getStringExtra("status");
+                if (status.equals("correct"))
+                {
+                    // obrisi markere sa pitanjima
+                    mMap.clear(); // TREBA OPET POSTAVITI SVE MARKERE
+                    friendsMarkers.clear(); // TREBA PROVERITI OVO
+                    questionNumber = 0;
+                    numberOfQuestion = 5;
+                    mCircle = null;
+                }
+                else
+                {
+                    Toast.makeText(MainActivity.this, "Error with sending questions on server.", Toast.LENGTH_SHORT).show();
+                }
+            }
+            else if (resultCode == 2)
+            {
+                questions.setQuestions(data.getStringExtra("question"));
+                questions.setCorrectAnswers(data.getStringExtra("correctAnswer"));
+                questions.setWrongAnswers(data.getStringExtra("wrongAnswer"));
+            } else if (resultCode == Activity.RESULT_CANCELED)
+            {
+
+            }
+        }
+    }
+
+    public class GetCategoryTask extends AsyncTask<Void, Void, String> {
+
+        private final String myLong;
+        private final String myLat;
+        private final String myUsername;
+        private final String myFriendsUsernames;
+
+        GetCategoryTask(String username, String friendUsernames, String longitude, String latitude) {
+            myUsername = username;
+            myFriendsUsernames = friendUsernames;
+            myLong = longitude;
+            myLat = latitude;
+        }
+
+        protected String doInBackground(Void... params) {
+            // TODO: attempt authentication against a network service.
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("myUsername", myUsername ));
+            postParameters.add(new BasicNameValuePair("friendsUsernames", myFriendsUsernames ));
+            postParameters.add(new BasicNameValuePair("myLong", myLong ));
+            postParameters.add(new BasicNameValuePair("myLat", myLat ));
+            String resCategory = null;
+            try {
+                // Simulate network access. // http://192.168.0.103:8081/process_checkuser
+                // 192.168.137.79:8081
+                resCategory = CustomHttpClient.executeHttpPost(ipAddress + "/process_getCategory", postParameters);
+                resCategory=resCategory.toString();
+                resCategory = resCategory.trim();
+                //Thread.sleep(100);
+            } catch (InterruptedException e) {
+                return "Error";
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "Error";
+            }
+
+            //return response;
+            return resCategory;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+
+            if (result.contains("Category"))
+            {
+                Gson gson = new Gson();
+                JsonArray jsonArray = new JsonParser().parse(result).getAsJsonArray();
+                Questions questions = new Questions();
+
+                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    JsonElement str = jsonArray.get(i);
+                    questions = gson.fromJson(str, Questions.class);
+
+                    Double lat = Double.parseDouble(questions.getLatitudeCategory());
+                    Double lon = Double.parseDouble(questions.getLongitudeCategory());
+                    LatLng categoryLatLng = new LatLng(lat, lon);
+                    final String category = questions.getCategory();
+                    final String userCreated = questions.getCreatedUser();
+                    Marker marker = mMap.addMarker(new MarkerOptions()
+                            .position(categoryLatLng)
+                            .title(questions.getID())
+                            .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                    mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+                        @Override
+                        public boolean onMarkerClick(Marker marker) {
+
+                            AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                                    .setMessage("Category: " + category + "\n" + "Created by " + userCreated + "\n\nDo you want to play game ?" )
+                                    .setCancelable(false)
+                                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int which)
+                                        {
+                                            // Perform Your Task Here--When Yes Is Pressed.
+                                            dialog.cancel();
+                                        }
+                                    })
+                                    .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int which)
+                                        {
+                                            // Perform Your Task Here--When No is pressed
+                                            dialog.cancel();
+                                        }
+                                    }).show();
+
+                            return false;
+                        }
+                    });
+                }
+            }
+
+
         }
     }
 

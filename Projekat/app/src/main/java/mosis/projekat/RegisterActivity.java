@@ -42,6 +42,8 @@ import java.util.Date;
 
 public class RegisterActivity extends AppCompatActivity {
 
+    private String ipAddress = "http://192.168.137.174:8081";
+
     private static final int SELECT_PICTURE = 100;
     private ImageButton selectImage;
     private Bitmap bitmap = null;
@@ -56,6 +58,7 @@ public class RegisterActivity extends AppCompatActivity {
     private View mRegisterFormView;
     private View mProgressView;
     ProjekatDBAdapter dbAdapter;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -343,10 +346,10 @@ public class RegisterActivity extends AppCompatActivity {
             try {
                 // Simulate network access. //http://192.168.0.103:8081/process_newuser
                 // 192.168.137.79:8081
-                response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_newuser", postParameters);
+                response = CustomHttpClient.executeHttpPost(ipAddress + "/process_newuser", postParameters);
                 res=response.toString();
                 res = res.trim();
-                Thread.sleep(2000);
+                //Thread.sleep(2000);
             } catch (InterruptedException e) {
                 return "Error";
             } catch (Exception e) {

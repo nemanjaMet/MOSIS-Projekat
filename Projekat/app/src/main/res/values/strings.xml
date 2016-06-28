@@ -31,4 +31,17 @@
     <!--<string name="permission_rationale">"Contacts permissions are needed for providing email
         completions."
     </string>-->
+    <string name="questionQ">Question</string>
+    <string name="correct_answerQ">Correct answer</string>
+    <string name="wrong_answerQ">Wrong answer</string>
+    <string name="next_questionQ">Next question</string>
+    <string name="post_questionQ">Post question</string>
+    <string name="number_of_questionQ">Number of question</string>
+    <string-array name = "spinner_item">
+        <item>Select category</item>
+        <item>Sport</item>
+        <item>History</item>
+        <item>Music, films and games</item>
+        <item>Education</item>
+    </string-array>
 </resources>

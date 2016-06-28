@@ -69,6 +69,8 @@ public class LoginActivity extends AppCompatActivity {
      */
     private UserLoginTask mAuthTask = null;
 
+    private String ipAddress = "http://192.168.137.174:8081";
+
     // UI references.
     private EditText mUsernameView;
     private EditText mPasswordView;
@@ -243,8 +245,8 @@ public class LoginActivity extends AppCompatActivity {
             String res = null;
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_checkuser
-                // 192.168.137.79:8081
-                response = CustomHttpClient.executeHttpPost("http://192.168.0.103:8081/process_checkuser", postParameters);
+                // 192.168.137.162:8081
+                response = CustomHttpClient.executeHttpPost(ipAddress + "/process_checkuser", postParameters);
                 res=response.toString();
                 res = res.trim();
                 //res= res.replaceAll("\\s+","");

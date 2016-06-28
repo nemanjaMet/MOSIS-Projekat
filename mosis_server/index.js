@@ -39,12 +39,147 @@ db.serialize(function () {
         "'User2' TEXT NOT NULL" +
     ");");
 
+    db.run("CREATE TABLE if not exists 'Questions' (" +
+        "'ID'   INTEGER PRIMARY KEY AUTOINCREMENT," +
+        "'Question' TEXT NOT NULL," +
+        "'CorrectAnswer' TEXT NOT NULL," +
+        "'WrongAnswer' TEXT NOT NULL," +
+        "'Category' TEXT NOT NULL," +
+        //"'CategoryLongLat' TEXT NOT NULL," +
+        "'LongitudeCategory' TEXT NOT NULL," +
+        "'LatitudeCategory' TEXT NOT NULL," +
+        "'CreatedUser' TEXT NOT NULL," +
+         "'UsersTryToAnswer' TEXT," +
+        "'LongitudeLatitude' TEXT NOT NULL" +
+    ");");
+
 });
 
 db.close();
 
 // Create application/x-www-form-urlencoded parser
 var urlencodedParser = bodyParser.urlencoded({ extended: false })
+
+app.post('/process_newquestion', urlencodedParser, function (req, res) {
+    console.log("New Question...");
+    // Prepare output in JSON format
+    response = {
+        category: req.body.category,
+        questions: req.body.questions,
+        correctAnswers: req.body.correctAnswers,
+        wrongAnswers: req.body.wrongAnswers,
+        longitudeLatitude: req.body.longitudeLatitude,
+        //categoryLongLat: req.body.categoryLongLat,
+        categoryLong: req.body.categoryLong,
+        categoryLat: req.body.categoryLat,
+        createdUser: req.body.createdUser,
+        friendsUsernames: req.body.friendsUsernames
+    };
+        var usersBlocked = "," + response.createdUser + ",";
+        if (response.friendsUsernames.length > 0)
+        {
+            usersBlocked += response.friendsUsernames + ",";
+        }
+
+        console.log("Blocked friends: " + usersBlocked);
+  
+        var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+           // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
+        db.run("INSERT into Questions(Category,Question, CorrectAnswer, WrongAnswer, LongitudeLatitude, LongitudeCategory, LatitudeCategory, UsersTryToAnswer, CreatedUser) VALUES ('" + response.category + "','" + response.questions + "','" + response.correctAnswers + "','" + response.wrongAnswers + "','" + response.longitudeLatitude +  "','" + response.categoryLong + "','" + response.categoryLat + "','" + usersBlocked +"','" + response.createdUser + "')", new function(err) {
+             if (err) {
+                console.log(err.message);
+                res.send("questErr");
+                return;
+        }
+        }
+            );
+        //query.finalize();
+        
+        });
+        db.close();
+
+        console.log("---SEND Question---");
+        console.log(response);
+        //res.end(JSON.stringify(response));
+        //res.end("complete");
+        res.send("success");
+        /*res.format({
+        'text/plain': function () {
+            res.send('complete');
+        }
+        });*/   
+   
+    
+});
+
+app.post('/process_getCategory', urlencodedParser, function (req, res) {
+
+    console.log("Get category...");
+    // Prepare output in JSON format
+    var response = {
+        myLong: req.body.myLong,
+        myLat: req.body.myLat,
+        myUsername: req.body.myUsername,
+        friendsUsernames: req.body.friendsUsernames
+        //questionID: req.body.questionID
+    };
+
+    var splited = response.friendsUsernames.split(",");
+    var query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from Questions where ";
+    for (var i = 0; i < splited.length; i++)
+    {
+        query += "UsersTryToAnswer NOT LIKE '%," + splited[i] + ",%' AND ";
+    }
+    //query = query.substring(3,query.lastIndexOf("AND"));
+    query += "UsersTryToAnswer NOT LIKE '%," + response.myUsername + ",%'";
+    console.log("Query quest: " + query);
+
+    var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+        //db.all("SELECT * from User where Username='" + response.username + "' and Password='" + response.password + "'", function (err, rows) {
+            db.all(query, function (err, rows) {
+
+            //rows contain values while errors, well you can figure out.
+            // res.send(JSON.stringify(rows));
+            console.log("Result category: " + JSON.stringify(rows));
+
+            if (err)
+                res.send("error");
+            res.send(JSON.stringify(rows));
+
+        });
+        db.close();
+    });
+
+});
+
+app.post('/process_getQuestion', urlencodedParser, function (req, res) {
+
+    console.log("Get questions...");
+    // Prepare output in JSON format
+    var response = {
+        questID: req.body.questID
+    };
+
+    var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+        //db.all("SELECT * from User where Username='" + response.username + "' and Password='" + response.password + "'", function (err, rows) {
+            db.all("SELECT ID,Questions,CorrectAnswer,WrongAnswer,LongitudeLatitude from Questions where ID '" + response.questID, function (err, rows) {
+
+            //rows contain values while errors, well you can figure out.
+            // res.send(JSON.stringify(rows));
+            console.log("Result category: " + JSON.stringify(rows));
+
+            if (err)
+                res.send(err);
+            res.send(JSON.stringify(rows));
+
+        });
+        db.close();
+    });
+
+});
 
 app.post('/process_newuser', urlencodedParser, function (req, res) {
     console.log("Novi podaci...");
@@ -366,7 +501,7 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
     else
     {
         console.log("No friends sending: nofriends");
-        res.send("nofriends");
+        res.send("noFriends");
     }
 });
 
