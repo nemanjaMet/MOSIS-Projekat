@@ -28,22 +28,28 @@ db.serialize(function () {
         "'Lastname' TEXT," +
         "'PhoneNumber' TEXT," +
         "'Image' TEXT," +
-        "'Created' TEXT" +
-        //"'Image' BLOB" +
+        "'Created' TEXT," +
+        "'Points' INTEGER" +
     ");");
 
     db.run("CREATE TABLE if not exists 'Friendship' (" +
         "'ID'   INTEGER PRIMARY KEY AUTOINCREMENT," +
-        "'Team_name' TEXT NOT NULL UNIQUE," +
+        "'Team_name' TEXT," +
         "'User1' TEXT NOT NULL," +
         "'User2' TEXT NOT NULL" +
     ");");
 
-    db.run("CREATE TABLE if not exists 'Questions' (" +
+    db.run("CREATE TABLE if not exists 'TeamPoints' (" +
         "'ID'   INTEGER PRIMARY KEY AUTOINCREMENT," +
-        "'Question' TEXT NOT NULL," +
-        "'CorrectAnswer' TEXT NOT NULL," +
-        "'WrongAnswer' TEXT NOT NULL," +
+        "'Team_name' TEXT," +
+        "'Points' INTEGER" +
+    ");");
+
+    db.run("CREATE TABLE if not exists 'CategoryQuestions' (" +
+        "'ID'   INTEGER PRIMARY KEY AUTOINCREMENT," +
+        "'Questions' TEXT NOT NULL," +
+        "'CorrectAnswers' TEXT NOT NULL," +
+        "'WrongAnswers' TEXT NOT NULL," +
         "'Category' TEXT NOT NULL," +
         //"'CategoryLongLat' TEXT NOT NULL," +
         "'LongitudeCategory' TEXT NOT NULL," +
@@ -60,8 +66,153 @@ db.close();
 // Create application/x-www-form-urlencoded parser
 var urlencodedParser = bodyParser.urlencoded({ extended: false })
 
+app.post('/process_addPoints', urlencodedParser, function (req, res) {
+    console.log("Adding points...");
+    // Prepare output in JSON format
+    response = {
+        username: req.body.username,
+        points: req.body.points
+    };
+  
+        var newPoints = parseInt(response.points);
+
+        var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+           // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
+        /*db.run("INSERT into User(Points) VALUES ('" + newPoints + "')", new function(err) {
+             if (err) {
+                console.log(err.message);
+                res.send("error");
+                return;
+            }
+        });*/
+        db.run("UPDATE User SET Points = Points + '" + newPoints + "' WHERE Username='" + response.username + "'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                res.send("error");
+                return;
+            }
+        });
+        });
+        db.close();
+
+        //updateTeamPoints(response.username, response.points);
+        console.log("---Points added---");
+        //console.log(response);
+        //res.end(JSON.stringify(response));
+        //res.end("complete");
+        res.send("success");
+        /*res.format({
+        'text/plain': function () {
+            res.send('complete');
+        }
+        });*/   
+   
+    
+});
+
+app.post('/process_getList', urlencodedParser, function (req, res) {
+
+    console.log("Get list...");
+    // Prepare output in JSON format
+    var response = {
+        fromPosition: req.body.fromPosition
+    };
+
+    var start = parseInt(response.fromPosition);
+    var end = start + 10;
+    var query = " " + start + "," + end;
+
+    var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+        //db.all("SELECT * from User where Username='" + response.username + "' and Password='" + response.password + "'", function (err, rows) {
+            db.all("SELECT Username,Points from User ORDER BY Points DESC LIMIT " + query, function (err, rows) {
+
+            //rows contain values while errors, well you can figure out.
+            // res.send(JSON.stringify(rows));
+            console.log("Result getList: " + JSON.stringify(rows));
+
+            if (err)
+            {
+                res.send(err);
+                return;
+            }
+                
+            res.send(JSON.stringify(rows));
+
+        });
+        db.close();
+    });
+
+});
+
+/*function updateTeamPoints(teamName, points)
+{
+    console.log("updateTeamPoints");
+    var newPoints = parseInt(points);
+
+        var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+        //db.run("UPDATE TeamPoints SET Points = Points + " + newPoints + "WHERE Username LIKE '%," + response.username + ",%'", new function(err) {
+            db.run("UPDATE TeamPoints SET Points = Points + " + newPoints + "WHERE Team_name='" + teamName + "'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                res.send("error");
+                return;
+            }
+        });
+        });
+        db.close();
+}
+
+function insertTeamNameTeamPoints(teamName)
+{
+     console.log("insertFirstTeam");
+    var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+        db.run("INSERT into TeamPoints(Team_name,Points) VALUES ('," + teamName + ",' , '0')", new function(err) {
+             if (err) {
+                console.log(err.message);
+                return;
+        }
+        }
+            );
+        
+        });
+        db.close();
+}*/
+
+/*function insertFriendUsernameTeamPoints(username)
+{
+    console.log("insertFriendUsername");
+    var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+        db.run("UPDATE TeamPoints SET Usernames = Usernames + '" + username + ",'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                return;
+        }
+        }
+            );
+        
+        });
+        db.close();
+}*/
+
+/*function getPoints(username, callback){
+    var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+        db.all("SELECT Points from User where Username='" + username + "'", function (err, rows) {
+                //console.log(JSON.stringify(rows))
+                     callback(JSON.stringify(rows)) ;
+            });
+            
+        }
+        db.close();
+}*/
+
 app.post('/process_newquestion', urlencodedParser, function (req, res) {
-    console.log("New Question...");
+    console.log("New CategoryQuestions...");
     // Prepare output in JSON format
     response = {
         category: req.body.category,
@@ -86,7 +237,7 @@ app.post('/process_newquestion', urlencodedParser, function (req, res) {
         var db = new sqlite3.Database('projekatDB.db');
         db.serialize(function () {
            // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
-        db.run("INSERT into Questions(Category,Question, CorrectAnswer, WrongAnswer, LongitudeLatitude, LongitudeCategory, LatitudeCategory, UsersTryToAnswer, CreatedUser) VALUES ('" + response.category + "','" + response.questions + "','" + response.correctAnswers + "','" + response.wrongAnswers + "','" + response.longitudeLatitude +  "','" + response.categoryLong + "','" + response.categoryLat + "','" + usersBlocked +"','" + response.createdUser + "')", new function(err) {
+        db.run("INSERT into CategoryQuestions(Category,Questions, CorrectAnswers, WrongAnswers, LongitudeLatitude, LongitudeCategory, LatitudeCategory, UsersTryToAnswer, CreatedUser) VALUES ('" + response.category + "','" + response.questions + "','" + response.correctAnswers + "','" + response.wrongAnswers + "','" + response.longitudeLatitude +  "','" + response.categoryLong + "','" + response.categoryLat + "','" + usersBlocked +"','" + response.createdUser + "')", new function(err) {
              if (err) {
                 console.log(err.message);
                 res.send("questErr");
@@ -118,21 +269,31 @@ app.post('/process_getCategory', urlencodedParser, function (req, res) {
     console.log("Get category...");
     // Prepare output in JSON format
     var response = {
-        myLong: req.body.myLong,
-        myLat: req.body.myLat,
+        /*myLong: req.body.myLong,
+        myLat: req.body.myLat,*/
+        readyQuery: req.body.readyQuery,
         myUsername: req.body.myUsername,
         friendsUsernames: req.body.friendsUsernames
         //questionID: req.body.questionID
     };
 
     var splited = response.friendsUsernames.split(",");
-    var query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from Questions where ";
+    var query = "";
+    if(response.readyQuery == 'null' || response.readyQuery == '')
+    {
+        query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from CategoryQuestions where ";
+    }
+    else
+    {
+        query = response.readyQuery + " AND";
+    }
+    
     for (var i = 0; i < splited.length; i++)
     {
-        query += "UsersTryToAnswer NOT LIKE '%," + splited[i] + ",%' AND ";
+        query += " UsersTryToAnswer NOT LIKE '%," + splited[i] + ",%' AND";
     }
     //query = query.substring(3,query.lastIndexOf("AND"));
-    query += "UsersTryToAnswer NOT LIKE '%," + response.myUsername + ",%'";
+    query += " UsersTryToAnswer NOT LIKE '%," + response.myUsername + ",%'";
     console.log("Query quest: " + query);
 
     var db = new sqlite3.Database('projekatDB.db');
@@ -145,7 +306,10 @@ app.post('/process_getCategory', urlencodedParser, function (req, res) {
             console.log("Result category: " + JSON.stringify(rows));
 
             if (err)
+            {
                 res.send("error");
+                return;
+            }            
             res.send(JSON.stringify(rows));
 
         });
@@ -159,20 +323,23 @@ app.post('/process_getQuestion', urlencodedParser, function (req, res) {
     console.log("Get questions...");
     // Prepare output in JSON format
     var response = {
-        questID: req.body.questID
+        categoryID: req.body.categoryID
     };
 
     var db = new sqlite3.Database('projekatDB.db');
     db.serialize(function () {
         //db.all("SELECT * from User where Username='" + response.username + "' and Password='" + response.password + "'", function (err, rows) {
-            db.all("SELECT ID,Questions,CorrectAnswer,WrongAnswer,LongitudeLatitude from Questions where ID '" + response.questID, function (err, rows) {
+            db.all("SELECT ID,Category,Questions,CorrectAnswers,WrongAnswers,LongitudeLatitude from CategoryQuestions where ID='" + response.categoryID +"'", function (err, rows) {
 
             //rows contain values while errors, well you can figure out.
             // res.send(JSON.stringify(rows));
             console.log("Result category: " + JSON.stringify(rows));
 
             if (err)
+            {
                 res.send(err);
+                return;
+            }
             res.send(JSON.stringify(rows));
 
         });
@@ -198,7 +365,7 @@ app.post('/process_newuser', urlencodedParser, function (req, res) {
         var db = new sqlite3.Database('projekatDB.db');
         db.serialize(function () {
            // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
-        db.run("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image, Created) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "','" + response.created + "')", new function(err) {
+        db.run("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image, Points ,Created) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "','" + "0','" +  response.created + "')", new function(err) {
              if (err) {
                 console.log(err.message);
                 res.send("userErr");
@@ -292,7 +459,10 @@ app.post('/process_getFriendProfile', urlencodedParser, function (req, res) {
             // res.send(JSON.stringify(rows));
 
             if (err)
+            {
                 res.send(err);
+                return;
+            } 
             res.send(JSON.stringify(rows));
 
         });
@@ -450,7 +620,7 @@ var usersLocations = [];
 //var usersLocations = new Map();
 // update-uje se soptsvena lokacija, i uzimaju se lokacije prijatelja
 app.post('/process_updatelocation', urlencodedParser, function (req, res) {
-    console.log("Update location...");
+    //console.log("Update location...");
     // Prepare output in JSON format
     response = {
         username: req.body.username,
@@ -459,7 +629,7 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
         latitude: req.body.latitude
     };
 
-    console.log(response);
+    //console.log(response);
 
     var userloc = {
         Username: response.username,
@@ -490,17 +660,17 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
         usersLocations.push(userloc);
     }
 
-    console.log(JSON.stringify(usersLocations));
+    //console.log(JSON.stringify(usersLocations));
 
     if (friendsloc.length > 0)
     { 
         //res.send(JSON.stringify(friendsloc));
-        console.log("Friends loc sending: " + JSON.stringify(friendsloc));
+        //console.log("Friends loc sending: " + JSON.stringify(friendsloc));
         res.send(friendsloc);
     }
     else
     {
-        console.log("No friends sending: nofriends");
+        //console.log("No friends sending: nofriends");
         res.send("noFriends");
     }
 });
@@ -508,10 +678,11 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
 
 var server = http.listen(process.env.PORT || 8081, function () {
 
-    var host = 'localhost'; //server.address().address;
-    var port = process.env.PORT; //server.address().port;
+    //var host = 'localhost'; //server.address().address;
+    //var port = process.env.PORT; //server.address().port;
 
-    console.log("Example app listening at http://%s:%s", host, port);
+    //console.log("Server started.......\n", host, port);
+    console.log("Server started.......\n");
 
 });
 

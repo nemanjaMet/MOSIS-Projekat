@@ -16,6 +16,8 @@ import android.database.Cursor;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.design.widget.TextInputLayout;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
@@ -42,7 +44,7 @@ import java.util.Date;
 
 public class RegisterActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.137.174:8081";
+    private String ipAddress = "http://192.168.137.225:8081";
 
     private static final int SELECT_PICTURE = 100;
     private ImageButton selectImage;
@@ -58,6 +60,7 @@ public class RegisterActivity extends AppCompatActivity {
     private View mRegisterFormView;
     private View mProgressView;
     ProjekatDBAdapter dbAdapter;
+    private boolean isMainActivity = false;
 
 
     @Override
@@ -104,6 +107,7 @@ public class RegisterActivity extends AppCompatActivity {
             dbAdapter.close();
             friend.setLongitude(String.valueOf(p.getDouble("longitude")));
             friend.setLatitude(String.valueOf(p.getDouble("latitude")));
+            isMainActivity = true;
 
             TextView selectAvatar = (TextView)findViewById(R.id.imageLabel);
             selectAvatar.setVisibility(View.INVISIBLE);
@@ -443,5 +447,17 @@ public class RegisterActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onBackPressed() {
+
+        if (isMainActivity) {
+            Intent returnIntent = new Intent(RegisterActivity.this, MainActivity.class);
+            setResult(RESULT_CANCELED,returnIntent);
+            finish();
+        } else {
+            super.onBackPressed();
+        }
     }
 }

@@ -19,6 +19,7 @@ public class User implements Serializable {
     String Created;
     String Longitude;
     String Latitude;
+    int Points;
 
     private static final long serialVersionUID = 1L;
 
@@ -34,6 +35,7 @@ public class User implements Serializable {
         this.Created = "";
         this.Longitude = "";
         this.Latitude = "";
+        this.Points = 0;
     }
 
     public User(String username)
@@ -154,5 +156,15 @@ public class User implements Serializable {
     public String getLatitude()
     {
         return this.Latitude;
+    }
+
+    public void setPoints(int points)
+    {
+        this.Points = points;
+    }
+
+    public int getPoints()
+    {
+        return this.Points;
     }
 }

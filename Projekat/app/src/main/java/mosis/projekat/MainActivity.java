@@ -73,9 +73,13 @@ import java.util.Date;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback,  com.google.android.gms.location.LocationListener,
-        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, GoogleMap.OnMarkerClickListener {
 
-    private String ipAddress = "http://192.168.137.174:8081";
+    private String ipAddress = "http://192.168.137.225:8081";
+    private  int categoryShowRadius = 250;
+    private double categoryRadius = 250.0; // u metrima
+    private double questionRadius = 50.0; // u metrima
+    private double radiusSearchCategory = categoryRadius;
     private UpdateLocTask mAuthTask = null;
     String response = null;
     SupportMapFragment sMapFragment;
@@ -97,6 +101,8 @@ public class MainActivity extends AppCompatActivity
     //private ArrayList<User> friendsAvatar;
     private ArrayMap<String, Bitmap> friendsAvatar;
     private ArrayList<Marker> friendsMarkers;
+    private ArrayList<Marker> categoryMarkers;
+    private ArrayList<Marker> questionMarkers;
     private int numberOfQuestion = 5;
     private int questionNumber = 0;
     Questions questions;
@@ -104,6 +110,7 @@ public class MainActivity extends AppCompatActivity
     private ImageView mMarkerImageView;
     private String ImageUrl = "";
     private Circle mCircle;
+    private int correctAnswered = 0;
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -136,10 +143,13 @@ public class MainActivity extends AppCompatActivity
                 if (questionNumber == 0)
                 {
                     // Select category and number of question
+                    mMap.clear();
+                    if (friendsMarkers != null)
+                        friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE
+                    categoryLatLng = myLoc;
                     Intent i = new Intent(MainActivity.this, QuestionActivity.class);
                     i.putExtra("questionNumber", Integer.toString(questionNumber));
                     startActivityForResult(i, 1);
-                    categoryLatLng = myLoc;
                 }
                 else if ((questionNumber - 1 )< numberOfQuestion)
                 {
@@ -147,7 +157,7 @@ public class MainActivity extends AppCompatActivity
                     questionLatLng = myLoc;
                     float meters[] = new float[1];
                     Location.distanceBetween(categoryLatLng.latitude, categoryLatLng.longitude, questionLatLng.latitude, questionLatLng.longitude, meters);
-                    if (meters[0] < 250.0)
+                    if (meters[0] < categoryRadius)
                     {
                         // moze da se postavi pitanja
                         Intent i = new Intent(MainActivity.this, QuestionActivity.class);
@@ -155,6 +165,11 @@ public class MainActivity extends AppCompatActivity
                         i.putExtra("numberOfQuestion", Integer.toString(numberOfQuestion));
                         i.putExtra("spinnerCategory", questions.getCategory());
                         startActivityForResult(i, 1);
+                    }
+                    else
+                    {
+                        // Toast to out of radius
+                        Toast.makeText(MainActivity.this, "You can add question only inside radius!", Toast.LENGTH_LONG).show();
                     }
                 }
                 else
@@ -350,10 +365,22 @@ public class MainActivity extends AppCompatActivity
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             GetCategoryTask mCategoryTask;
-            mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, Double.toString(myLoc.longitude), Double.toString(myLoc.latitude));
+            mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, "");
             //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
             mCategoryTask.execute();
             return true;
+        } else if (id == R.id.action_search_categories)
+        {
+            Intent i = new Intent(MainActivity.this, SearchActivity.class);
+            startActivityForResult(i, 1);
+        }
+        else if (id == R.id.action_show_list)
+        {
+            Intent i = new Intent(MainActivity.this, ActivityList.class);
+            startActivityForResult(i, 1);
+            /*Intent i = new Intent(MainActivity.this, GameActivity.class);
+            i.putExtra("showList", "true");
+            startActivityForResult(i, 1);*/
         }
 
         return super.onOptionsItemSelected(item);
@@ -563,6 +590,109 @@ public class MainActivity extends AppCompatActivity
         Log.d(TAG, "Connection failed: " + connectionResult.toString());
     }
 
+    @Override
+    public boolean onMarkerClick(final Marker marker) {
+
+        if (friendsMarkers.contains(marker))
+        {
+            //Toast.makeText(MainActivity.this,marker.getTitle(),Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
+            //i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra("friendUsername", marker.getTitle());
+            intent.putExtra("longitude",marker.getPosition().longitude);
+            intent.putExtra("latitude", marker.getPosition().latitude);
+            startActivityForResult(intent, 1);
+        }
+        else if (categoryMarkers.contains(marker))
+        {
+            float meters[] = new float[1];
+            Location.distanceBetween(marker.getPosition().latitude, marker.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
+            if (meters[0] < categoryRadius)
+            {
+                AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(marker.getSnippet() + "\n\nDo you want to play game ?" )
+                        .setCancelable(false)
+                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which)
+                            {
+                                // User zeli da odgovara na kliknutu kategoriju
+                                // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
+                                String categoryID = marker.getTitle();
+                                GetQuestionsForCategoryTask mQuestionTask;
+                                mQuestionTask = new GetQuestionsForCategoryTask(categoryID);
+                                //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+                                mQuestionTask.execute();
+                            }
+                        })
+                        .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which)
+                            {
+                                // Perform Your Task Here--When No is pressed
+                                dialog.cancel();
+                            }
+                        }).show();
+            }
+            else
+            {
+                // Toast to far from category
+                Toast.makeText(MainActivity.this, "You are two far from category!", Toast.LENGTH_SHORT).show();
+            }
+        }
+        else if (questionMarkers.contains(marker))
+        {
+            final String numbOfQuest = Integer.toString(numberOfQuestion);
+            float meters[] = new float[1];
+            Location.distanceBetween(marker.getPosition().latitude, marker.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
+            if (meters[0] < questionRadius)
+            {
+                AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                        .setMessage("Question: " + marker.getTitle() + "/" + numbOfQuest + "\n\nDo you want to answer ?" )
+                        .setCancelable(false)
+                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which)
+                            {
+                                // User zeli da odgovara na kliknutu kategoriju
+                                // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
+                                String questID = marker.getTitle();
+                                dbAdapter.open();
+                                Questions questDB = dbAdapter.getQuestion(questID);
+                                dbAdapter.close();
+                                marker.remove(); // uklanjanje markera
+                                String [] wrongAnswer123 = questDB.getWrongAnswers().split("\\|\\|");
+                                Intent i = new Intent(MainActivity.this, GameActivity.class);
+                                i.putExtra("question", questDB.getQuestions());
+                                i.putExtra("correctAnswer", questDB.getCorrectAnswers());
+                                i.putExtra("wrongAnswer1", wrongAnswer123[0]);
+                                i.putExtra("wrongAnswer2", wrongAnswer123[1]);
+                                i.putExtra("wrongAnswer3", wrongAnswer123[2]);
+                                i.putExtra("questID", questID);
+                                i.putExtra("myUsername", myUsername);
+                                i.putExtra("correctAnswered", Integer.toString(correctAnswered));
+                                startActivityForResult(i, 1);
+                            }
+                        })
+                        .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which)
+                            {
+                                // Perform Your Task Here--When No is pressed
+                                dialog.cancel();
+                            }
+                        }).show();
+            }
+            else
+            {
+                // Toast to far from category
+                Toast.makeText(MainActivity.this, "You are two far from question!", Toast.LENGTH_LONG).show();
+            }
+        }
+        else
+        {
+            // SOMETHING WRONG WITH MARKER
+        }
+
+        return false;
+    }
+
     /*@Override
     public boolean onMarkerClick(Marker marker) {
         Toast.makeText(this,marker.getTitle(),Toast.LENGTH_LONG).show();
@@ -661,20 +791,22 @@ public class MainActivity extends AppCompatActivity
                                         //.icon(BitmapDescriptorFactory.fromBitmap((Bitmap) friendsAvatar.get("user2"))));
                                         //.icon(BitmapDescriptorFactory.fromBitmap(thumbnail)));
                                         .icon(BitmapDescriptorFactory.fromBitmap(getMarkerBitmapFromView(mCustomMarkerView, thumbnail))));
-                                mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+                                friendsMarkers.add(friendMarker);
+                                mMap.setOnMarkerClickListener(MainActivity.this);
+                                /*mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
                                     @Override
-                                    public boolean onMarkerClick(Marker marker) {
+                                    public boolean onMarkerClick(Marker markerFriend) {
                                         //Toast.makeText(MainActivity.this,marker.getTitle(),Toast.LENGTH_LONG).show();
                                         Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
                                         //i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                                        intent.putExtra("friendUsername", marker.getTitle());
-                                        intent.putExtra("longitude",marker.getPosition().longitude);
-                                        intent.putExtra("latitude", marker.getPosition().latitude);
+                                        intent.putExtra("friendUsername", markerFriend.getTitle());
+                                        intent.putExtra("longitude",markerFriend.getPosition().longitude);
+                                        intent.putExtra("latitude", markerFriend.getPosition().latitude);
                                         startActivity(intent);
                                         return false;
                                     }
-                                }); // PUCA !!!!!!!!!!
-                                friendsMarkers.add(friendMarker);
+                                }); // PUCA !!!!!!!!!!*/
+                               // friendsMarkers.add(friendMarker);
 
 
                             /*mMap.setOnMapClickListener(new GoogleMap.OnMarkerClickListener()
@@ -700,6 +832,154 @@ public class MainActivity extends AppCompatActivity
         @Override
         protected void onCancelled() {
             mAuthTask = null;
+        }
+    }
+
+    public class GetQuestionsForCategoryTask extends AsyncTask<Void, Void, String> {
+
+        private final String mCategoryID;
+
+        GetQuestionsForCategoryTask(String categoryID) {
+            mCategoryID = categoryID;
+        }
+
+        protected String doInBackground(Void... params) {
+            // TODO: attempt authentication against a network service.
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("categoryID", mCategoryID ));
+            String resQuestions = null;
+            try {
+                // Simulate network access. // http://192.168.0.103:8081/process_checkuser
+                // 192.168.137.79:8081
+                resQuestions = CustomHttpClient.executeHttpPost(ipAddress + "/process_getQuestion", postParameters);
+                resQuestions = resQuestions.toString();
+                resQuestions = resQuestions.trim();
+            } catch (InterruptedException e) {
+                return "Error";
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "Error";
+            }
+
+            //return response;
+            return resQuestions;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+
+            if (result.contains("Category"))
+            {
+                questionMarkers = new ArrayList<Marker>();
+
+                Gson gson = new Gson();
+                JsonArray jsonArray = new JsonParser().parse(result).getAsJsonArray();
+                Questions questionsCategory = new Questions();
+
+                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    JsonElement str = jsonArray.get(i);
+                    questionsCategory = gson.fromJson(str, Questions.class);
+
+                }
+
+                correctAnswered = 0;
+                questionNumber = 0;
+                // ubacivanje pitanja i odgovora lokalnu u bazi
+                mMap.clear();
+                categoryMarkers.clear();
+                addMarkersAfterClearMap();
+
+                /*if (friendsMarkers != null)
+                {
+                    friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE
+                    friendsMarkers = new ArrayList<Marker>();
+                }*/
+
+                dbAdapter = new ProjekatDBAdapter(getApplicationContext());
+                dbAdapter.open();
+                //dbAdapter.getAllQuestions();
+                dbAdapter.deleteAllQuestions();
+                dbAdapter.insertQuestions(questionsCategory);
+                numberOfQuestion = dbAdapter.getAllQuestions(); // Broj pitanja u bazi
+                dbAdapter.close();
+
+                String [] questLongLat = questionsCategory.getLongitudeLatitude().split("&&");
+                for (int i =0; i < questLongLat.length; i++)
+                {
+                    String [] longLat = questLongLat[i].split(",");
+                    Double lat = Double.parseDouble(longLat[1]);
+                    Double lon = Double.parseDouble(longLat[0]);
+                    LatLng questionLatLng = new LatLng(lat, lon);
+                    final String questNumber = Integer.toString(i+1);
+                    //final String numbOfQuest = Integer.toString(questLongLat.length);
+
+
+                    Marker marker = mMap.addMarker(new MarkerOptions()
+                            .position(questionLatLng)
+                            .title(questNumber)
+                            .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                    questionMarkers.add(marker);
+                    mMap.setOnMarkerClickListener(MainActivity.this);
+                       /* mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+                            @Override
+                            public boolean onMarkerClick(final Marker marker) {
+
+                                float meters[] = new float[1];
+                                Location.distanceBetween(marker.getPosition().latitude, marker.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
+                                if (meters[0] < questionRadius)
+                                {
+                                    AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                                            .setMessage("Question: " + marker.getTitle() + "/" + numbOfQuest + "\n\nDo you want to answer ?" )
+                                            .setCancelable(false)
+                                            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                                                public void onClick(DialogInterface dialog, int which)
+                                                {
+                                                    // User zeli da odgovara na kliknutu kategoriju
+                                                    // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
+                                                    String questID = marker.getTitle();
+                                                    dbAdapter.open();
+                                                    Questions questDB = dbAdapter.getQuestion(questID);
+                                                    dbAdapter.close();
+                                                    marker.remove(); // uklanjanje markera
+                                                    String [] wrongAnswer123 = questDB.getWrongAnswers().split("\\|\\|");
+                                                    Intent i = new Intent(MainActivity.this, GameActivity.class);
+                                                    i.putExtra("question", questDB.getQuestions());
+                                                    i.putExtra("correctAnswer", questDB.getCorrectAnswers());
+                                                    i.putExtra("wrongAnswer1", wrongAnswer123[0]);
+                                                    i.putExtra("wrongAnswer2", wrongAnswer123[1]);
+                                                    i.putExtra("wrongAnswer3", wrongAnswer123[2]);
+                                                    i.putExtra("questID", questID);
+                                                    i.putExtra("myUsername", myUsername);
+                                                    i.putExtra("correctAnswered", Integer.toString(correctAnswered));
+                                                    startActivityForResult(i, 1);
+
+
+                                                    //dialog.cancel();
+                                                }
+                                            })
+                                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                                                public void onClick(DialogInterface dialog, int which)
+                                                {
+                                                    // Perform Your Task Here--When No is pressed
+                                                    dialog.cancel();
+                                                }
+                                            }).show();
+                                }
+                                else
+                                {
+                                    // Toast to far from category
+                                    Toast.makeText(MainActivity.this, "You are two far from question!", Toast.LENGTH_LONG).show();
+                                }
+                                return false;
+                            }
+                        });*/
+                }
+
+            }
+
         }
     }
 
@@ -995,7 +1275,7 @@ public class MainActivity extends AppCompatActivity
                 //questions.setCategoryLongLat(Double.toString(categoryLatLng.longitude) + "," + Double.toString(categoryLatLng.latitude));
                 questions.setLongitudeCategory(Double.toString(categoryLatLng.longitude));
                 questions.setLatitudeCategory(Double.toString(categoryLatLng.latitude));
-                drawCircle(categoryLatLng, 250.0);
+                drawCircle(categoryLatLng, categoryRadius);
                 Toast.makeText(MainActivity.this, "Post questions on desired locations, near this location... ", Toast.LENGTH_LONG).show();
             }
             else if(resultCode == Activity.RESULT_OK){
@@ -1005,7 +1285,7 @@ public class MainActivity extends AppCompatActivity
                     questions.setQuestions(data.getStringExtra("question"));
                     questions.setCorrectAnswers(data.getStringExtra("correctAnswer"));
                     questions.setWrongAnswers(data.getStringExtra("wrongAnswer"));
-                    questions.setLongitudeLatitude(Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.longitude));
+                    questions.setLongitudeLatitude(Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.latitude));
                 }
                 else
                 {
@@ -1014,7 +1294,7 @@ public class MainActivity extends AppCompatActivity
                     questions.setQuestions(questions.getQuestions() + separate + data.getStringExtra("question"));
                     questions.setCorrectAnswers(questions.getCorrectAnswers() + separate + data.getStringExtra("correctAnswer"));
                     questions.setWrongAnswers(questions.getWrongAnswers() + separate + data.getStringExtra("wrongAnswer"));
-                    questions.setLongitudeLatitude(questions.getLongitudeLatitude() + separate + Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.longitude));
+                    questions.setLongitudeLatitude(questions.getLongitudeLatitude() + separate + Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.latitude));
                 }
 
                 Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
@@ -1056,8 +1336,12 @@ public class MainActivity extends AppCompatActivity
                 if (status.equals("correct"))
                 {
                     // obrisi markere sa pitanjima
+                    if (questionMarkers != null)
+                        questionMarkers.clear();
                     mMap.clear(); // TREBA OPET POSTAVITI SVE MARKERE
-                    friendsMarkers.clear(); // TREBA PROVERITI OVO
+                    addMarkersAfterClearMap();
+                    /*if (friendsMarkers != null)
+                        friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE*/
                     questionNumber = 0;
                     numberOfQuestion = 5;
                     mCircle = null;
@@ -1072,25 +1356,91 @@ public class MainActivity extends AppCompatActivity
                 questions.setQuestions(data.getStringExtra("question"));
                 questions.setCorrectAnswers(data.getStringExtra("correctAnswer"));
                 questions.setWrongAnswers(data.getStringExtra("wrongAnswer"));
-            } else if (resultCode == Activity.RESULT_CANCELED)
+            }
+            else if (resultCode == 4)
+            {
+                String status = data.getStringExtra("status");
+                questionNumber++;
+                if (status.equals("correct"))
+                {
+                    correctAnswered++;
+                }
+
+                if (questionNumber == numberOfQuestion)
+                {
+                    //Toast.makeText(MainActivity.this, "Vrati markere za Kategorije!", Toast.LENGTH_LONG).show();
+                    mMap.clear();
+                    if (questionMarkers != null)
+                        questionMarkers.clear();
+                    addMarkersAfterClearMap();
+                    GetCategoryTask mCategoryTask;
+                    mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, "");
+                    //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+                    mCategoryTask.execute();
+                }
+            }
+
+            else if (resultCode == Activity.RESULT_CANCELED)
             {
 
+            }
+            else if (resultCode == 5) // SEARCH ACTIVITY
+            {
+                String categorySearch = data.getStringExtra("category");
+                String radiusSearch = data.getStringExtra("radius");
+                String userCreatedSearch = data.getStringExtra("categoryCreated");
+
+                if (radiusSearch.isEmpty())
+                {
+                    radiusSearch = Integer.toString(categoryShowRadius); // default da stavim
+                }
+
+                radiusSearchCategory = Double.parseDouble(radiusSearch);
+
+
+                String [] categorySplit = categorySearch.split(",");
+                String query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from CategoryQuestions where ";
+
+                for (int i = 0; i < categorySplit.length; i++)
+                {
+                    query += " Category='" + categorySplit[i] + "' OR";
+                }
+                query = query.substring(0,query.length() - 2);
+
+                if (!userCreatedSearch.isEmpty())
+                {
+                    query += " AND CreatedUser='" + userCreatedSearch + "' ";
+                }
+
+                double [] boundingBox = getBoundingBox(myLoc.latitude, myLoc.longitude, Integer.parseInt(radiusSearch));
+
+                query += " AND LatitudeCategory > '" + Double.toString(boundingBox[0]) + "' ";
+                query += "AND LongitudeCategory > '" + Double.toString(boundingBox[1]) + "' ";
+                query += "AND LatitudeCategory < '" + Double.toString(boundingBox[2]) + "' ";
+                query += "AND LongitudeCategory < '" + Double.toString(boundingBox[3]) + "' ";
+
+                GetCategoryTask mCategoryTask;
+                mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, query);
+                //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+                mCategoryTask.execute();
             }
         }
     }
 
     public class GetCategoryTask extends AsyncTask<Void, Void, String> {
 
-        private final String myLong;
-        private final String myLat;
+        //private final String myLong;
+        //private final String myLat;
         private final String myUsername;
         private final String myFriendsUsernames;
+        private final String readyQuery;
 
-        GetCategoryTask(String username, String friendUsernames, String longitude, String latitude) {
+        GetCategoryTask(String username, String friendUsernames, String query) {
             myUsername = username;
             myFriendsUsernames = friendUsernames;
-            myLong = longitude;
-            myLat = latitude;
+            readyQuery = query;
+           /* myLong = longitude;
+            myLat = latitude;*/
         }
 
         protected String doInBackground(Void... params) {
@@ -1098,8 +1448,9 @@ public class MainActivity extends AppCompatActivity
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("myUsername", myUsername ));
             postParameters.add(new BasicNameValuePair("friendsUsernames", myFriendsUsernames ));
-            postParameters.add(new BasicNameValuePair("myLong", myLong ));
-            postParameters.add(new BasicNameValuePair("myLat", myLat ));
+            postParameters.add(new BasicNameValuePair("readyQuery", readyQuery ));
+            /*postParameters.add(new BasicNameValuePair("myLong", myLong ));
+            postParameters.add(new BasicNameValuePair("myLat", myLat ));*/
             String resCategory = null;
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_checkuser
@@ -1124,56 +1475,179 @@ public class MainActivity extends AppCompatActivity
 
             if (result.contains("Category"))
             {
+                if (categoryMarkers != null)
+                {
+                    mMap.clear();
+                    categoryMarkers.clear();
+                    addMarkersAfterClearMap();
+                }
+
+                categoryMarkers = new ArrayList<Marker>();
+
                 Gson gson = new Gson();
                 JsonArray jsonArray = new JsonParser().parse(result).getAsJsonArray();
-                Questions questions = new Questions();
+                Questions questionsCategory = new Questions();
 
                 Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
                 Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
 
                 for (int i = 0; i < jsonArray.size(); i++) {
                     JsonElement str = jsonArray.get(i);
-                    questions = gson.fromJson(str, Questions.class);
+                    questionsCategory = gson.fromJson(str, Questions.class);
 
-                    Double lat = Double.parseDouble(questions.getLatitudeCategory());
-                    Double lon = Double.parseDouble(questions.getLongitudeCategory());
+                    Double lat = Double.parseDouble(questionsCategory.getLatitudeCategory());
+                    Double lon = Double.parseDouble(questionsCategory.getLongitudeCategory());
                     LatLng categoryLatLng = new LatLng(lat, lon);
-                    final String category = questions.getCategory();
-                    final String userCreated = questions.getCreatedUser();
-                    Marker marker = mMap.addMarker(new MarkerOptions()
-                            .position(categoryLatLng)
-                            .title(questions.getID())
-                            .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
-                    mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+
+                    float meters[] = new float[1];
+                    Location.distanceBetween(lat, lon, myLoc.latitude, myLoc.longitude, meters);
+                    if (meters[0] <= radiusSearchCategory) {
+
+                        final String category = questionsCategory.getCategory();
+                        final String userCreated = questionsCategory.getCreatedUser();
+                        Marker markerCategory = mMap.addMarker(new MarkerOptions()
+                                .position(categoryLatLng)
+                                .title(questionsCategory.getID())
+                                .snippet("Category: " + category + "\n" + "Created by " + userCreated)
+                                .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                        categoryMarkers.add(markerCategory);
+
+                        mMap.setOnMarkerClickListener(MainActivity.this);
+                    /*mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
                         @Override
-                        public boolean onMarkerClick(Marker marker) {
+                        public boolean onMarkerClick(final Marker mQuest) {
 
-                            AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
-                                    .setMessage("Category: " + category + "\n" + "Created by " + userCreated + "\n\nDo you want to play game ?" )
-                                    .setCancelable(false)
-                                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface dialog, int which)
-                                        {
-                                            // Perform Your Task Here--When Yes Is Pressed.
-                                            dialog.cancel();
-                                        }
-                                    })
-                                    .setNegativeButton("No", new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface dialog, int which)
-                                        {
-                                            // Perform Your Task Here--When No is pressed
-                                            dialog.cancel();
-                                        }
-                                    }).show();
-
+                            float meters[] = new float[1];
+                            Location.distanceBetween(mQuest.getPosition().latitude, mQuest.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
+                            if (meters[0] < categoryRadius)
+                            {
+                                AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                                        .setMessage("Category: " + category + "\n" + "Created by " + userCreated + "\n\nDo you want to play game ?" )
+                                        .setCancelable(false)
+                                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                                            public void onClick(DialogInterface dialog, int which)
+                                            {
+                                                // User zeli da odgovara na kliknutu kategoriju
+                                                // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
+                                                String categoryID = mQuest.getTitle();
+                                                GetQuestionsForCategory mQuestionTask;
+                                                mQuestionTask = new GetQuestionsForCategory(categoryID);
+                                                //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+                                                mQuestionTask.execute();
+                                                //dialog.cancel();
+                                            }
+                                        })
+                                        .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                                            public void onClick(DialogInterface dialog, int which)
+                                            {
+                                                // Perform Your Task Here--When No is pressed
+                                                dialog.cancel();
+                                            }
+                                        }).show();
+                            }
+                            else
+                            {
+                                // Toast to far from category
+                                Toast.makeText(MainActivity.this, "You are two far from category!", Toast.LENGTH_SHORT).show();
+                            }
                             return false;
                         }
-                    });
+                    });*/
+                    }
                 }
             }
-
-
         }
     }
 
+    private double[] getBoundingBox(final double pLatitude, final double pLongitude, final int pDistanceInMeters) {
+
+        final double[] boundingBox = new double[4];
+
+        final double latRadian = Math.toRadians(pLatitude);
+
+        final double degLatKm = 110.574235;
+        final double degLongKm = 110.572833 * Math.cos(latRadian);
+        final double deltaLat = pDistanceInMeters / 1000.0 / degLatKm;
+        final double deltaLong = pDistanceInMeters / 1000.0 /
+                degLongKm;
+
+        final double minLat = pLatitude - deltaLat;
+        final double minLong = pLongitude - deltaLong;
+        final double maxLat = pLatitude + deltaLat;
+        final double maxLong = pLongitude + deltaLong;
+
+        boundingBox[0] = minLat;
+        boundingBox[1] = minLong;
+        boundingBox[2] = maxLat;
+        boundingBox[3] = maxLong;
+
+        return boundingBox;
+    }
+
+    private void addMarkersAfterClearMap()
+    {
+        if (friendsMarkers != null)
+        {
+            for (int i = 0; i < friendsMarkers.size(); i++)
+            {
+                Marker marker = friendsMarkers.get(i);
+
+                Bitmap thumbnail = ThumbnailUtils.extractThumbnail(((Bitmap) friendsAvatar.get(marker.getTitle())), 50, 50);
+
+                Marker friendMarker = mMap.addMarker(new MarkerOptions()
+                        .position(marker.getPosition())
+                        .title(marker.getTitle())
+                        .icon(BitmapDescriptorFactory.fromBitmap(getMarkerBitmapFromView(mCustomMarkerView, thumbnail))));
+
+                friendsMarkers.set(i, friendMarker);
+
+                mMap.setOnMarkerClickListener(MainActivity.this);
+            }
+        }
+
+        if (categoryMarkers != null)
+        {
+            for (int i = 0; i < categoryMarkers.size(); i++)
+            {
+                Marker marker = categoryMarkers.get(i);
+
+                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+
+                Marker markerCategory = mMap.addMarker(new MarkerOptions()
+                        .position(marker.getPosition())
+                        .title(marker.getTitle())
+                        .snippet(marker.getSnippet())
+                        .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+
+                categoryMarkers.set(i, markerCategory);
+
+                mMap.setOnMarkerClickListener(MainActivity.this);
+            }
+
+        }
+
+        /*if (questionMarkers != null)
+        {
+            for (int i = 0; i < questionMarkers.size(); i++)
+            {
+                Marker marker = questionMarkers.get(i);
+
+                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+
+                Marker questMarker = mMap.addMarker(new MarkerOptions()
+                        .position(marker.getPosition())
+                        .title(marker.getTitle())
+                        .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+
+
+                questionMarkers.add(marker);
+
+
+               // mMap.setOnMarkerClickListener(MainActivity.this);
+
+            }
+        }*/
+    }
 }

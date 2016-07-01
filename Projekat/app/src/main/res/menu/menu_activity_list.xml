@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/begining_list"
+        app:showAsAction="never"
+        android:title="First list">
+    </item>
+    <item
+        android:id="@+id/next_list"
+        app:showAsAction="never"
+        android:title="Next list">
+    </item>
+    <item
+        android:id="@+id/previus_list"
+        app:showAsAction="never"
+        android:title="Previus list">
+    </item>
+</menu>

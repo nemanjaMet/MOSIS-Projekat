@@ -23,6 +23,17 @@ public class ProjekatDatabaseHelper extends SQLiteOpenHelper {
             + ProjekatDBAdapter.IMAGE + " text, "
             + ProjekatDBAdapter.CREATED + " text);";
 
+    private static final String DATABASE_CREATE2 = "create table "
+            + ProjekatDBAdapter.DATABASE_TABLE2  + " ("
+            + ProjekatDBAdapter.QID + " integer primary key autoincrement, "
+            + ProjekatDBAdapter.QUEST_ID + " text, "
+            + ProjekatDBAdapter.QUEST_QUESTIONS +" text, "
+            + ProjekatDBAdapter.QUEST_CORRECT_ANSWER +" text, "
+            + ProjekatDBAdapter.QUEST_WRONG_ANSWER1 +" text, "
+            + ProjekatDBAdapter.QUEST_WRONG_ANSWER2 +" text, "
+            + ProjekatDBAdapter.QUEST_WRONG_ANSWER3 +" text);"
+            ;
+
     public ProjekatDatabaseHelper(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
         super(context, name, factory, version);
     }
@@ -31,6 +42,7 @@ public class ProjekatDatabaseHelper extends SQLiteOpenHelper {
     public void onCreate(SQLiteDatabase db) {
         try {
             db.execSQL(DATABASE_CREATE);
+            db.execSQL(DATABASE_CREATE2);
         } catch (SQLiteException ec){
             Log.v("ProjekatDatabaseHelper", ec.getMessage());
         }
@@ -39,7 +51,18 @@ public class ProjekatDatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE);
+        db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE2);
         onCreate(db);
+    }
+
+    public void dropCreateQuestions(SQLiteDatabase db)
+    {
+        try {
+            db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE2);
+            db.execSQL(DATABASE_CREATE2);
+        } catch (SQLiteException ec){
+            Log.v("ProjekatDatabaseHelper", ec.getMessage());
+        }
     }
 
 }

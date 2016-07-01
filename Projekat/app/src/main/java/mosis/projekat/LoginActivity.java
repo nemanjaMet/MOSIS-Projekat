@@ -69,7 +69,7 @@ public class LoginActivity extends AppCompatActivity {
      */
     private UserLoginTask mAuthTask = null;
 
-    private String ipAddress = "http://192.168.137.174:8081";
+    private String ipAddress = "http://192.168.137.225:8081";
 
     // UI references.
     private EditText mUsernameView;

@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
@@ -30,6 +31,15 @@ public class ProjekatDBAdapter {
     public static final String PHONE_NUMBER = "PhoneNumber";
     public static final String IMAGE = "Image";
     public static final String CREATED = "Created";
+
+    public static final String DATABASE_TABLE2 = "Questions";
+    public static final String QUEST_ID = "QuestID";
+    public static final String QID = "ID";
+    public static final String QUEST_QUESTIONS = "Question";
+    public static final String QUEST_CORRECT_ANSWER = "CorrectAnswer";
+    public static final String QUEST_WRONG_ANSWER1 = "WrongAnswer1";
+    public static final String QUEST_WRONG_ANSWER2 = "WrongAnswer2";
+    public static final String QUEST_WRONG_ANSWER3 = "WrongAnswer3";
 
     private SQLiteDatabase db;
 
@@ -248,4 +258,126 @@ public class ProjekatDBAdapter {
         }
     }
 
+    // Dodavanje podatka u bazu
+    public long insertQuestions(Questions questions) {
+        // dbHelper.onCreate(db);
+
+        boolean error = false;
+        long id = -1;
+        String [] question = questions.getQuestions().split("&&");
+        String [] correctAnswer = questions.getCorrectAnswers().split("&&");
+        String [] wrongAnswer = questions.getWrongAnswers().split("&&");
+
+        ContentValues contentValues = new ContentValues();
+        for (int i=0; i < question.length; i++)
+        {
+            String [] wrongAnswer123 = wrongAnswer[i].split("\\|\\|");
+
+            String questID = Integer.toString(i+1);
+            contentValues.put(QUEST_ID, questID);
+            contentValues.put(QUEST_QUESTIONS, question[i]);
+            contentValues.put(QUEST_CORRECT_ANSWER, correctAnswer[i]);
+            contentValues.put(QUEST_WRONG_ANSWER1, wrongAnswer123[0]);
+            contentValues.put(QUEST_WRONG_ANSWER2, wrongAnswer123[1]);
+            contentValues.put(QUEST_WRONG_ANSWER3, wrongAnswer123[2]);
+            id = -1;
+            db.beginTransaction();
+            try {
+                id = db.insert(DATABASE_TABLE2, null, contentValues);
+                db.setTransactionSuccessful();
+
+            } catch (SQLiteException ec) {
+                Log.w("ProjekatDBAdapter", ec.getMessage());
+            } finally {
+                db.endTransaction();
+            }
+            if (id == -1)
+            {
+                error = true;
+                // break;
+            }
+        }
+        if (error)
+            id = -1;
+        return id;
+    }
+
+    // Vracanje 1 podatka iz baze
+    public Questions getQuestion(String questID) {
+        Questions questions = null;
+        Cursor cursor = null;
+        db.beginTransaction();
+        try {
+            cursor = db.query(DATABASE_TABLE2, null, QUEST_ID + "='" + Integer.parseInt(questID) + "'", null, null, null, null);
+            db.setTransactionSuccessful();
+        } catch (SQLiteException ec) {
+            Log.v("ProjekatDBAdapter", ec.getMessage());
+        } finally {
+            db.endTransaction();
+        }
+
+        if (cursor != null)
+        {
+            if (cursor.moveToFirst()) {
+                questions = new Questions();
+                questions.setID(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_ID)));
+                questions.setQuestions(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_QUESTIONS)));
+                questions.setCorrectAnswers(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_CORRECT_ANSWER)));
+                String wrongAnsw123 = cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_WRONG_ANSWER1));
+                wrongAnsw123 += "||" + cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_WRONG_ANSWER2));
+                wrongAnsw123 += "||" + cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_WRONG_ANSWER3));
+                questions.setWrongAnswers(wrongAnsw123);
+            }
+        }
+        return questions;
+    }
+
+    public void deleteAllQuestions()
+    {
+        //db.delete(DATABASE_TABLE2,null,null);
+        /*db.execSQL("DROP TABLE IF EXISTS " + DATABASE_TABLE2);
+        try {
+
+            db.execSQL(db.);
+        } catch (SQLiteException ec){
+            Log.v("ProjekatDatabaseHelper", ec.getMessage());
+        }*/
+        dbHelper.dropCreateQuestions(db);
+    }
+
+    // Vracanje svih Username-a i kada su kreirani iz baze
+    public int getAllQuestions() {
+        ArrayList<Questions> questions = null;
+        int result = 0;
+        Cursor cursor = null;
+        db.beginTransaction();
+        try {
+            String[] columnsToReturn ={QUEST_ID, QUEST_QUESTIONS, QUEST_CORRECT_ANSWER, QUEST_WRONG_ANSWER1, QUEST_WRONG_ANSWER2, QUEST_WRONG_ANSWER3};
+            cursor = db.query(DATABASE_TABLE2, columnsToReturn, null, null, null, null, null);
+            db.setTransactionSuccessful();
+        } catch (SQLiteException ec) {
+            Log.v("ProjekatDBAdapter", ec.getMessage());
+        } finally {
+            db.endTransaction();
+        }
+
+        if (cursor != null)
+        {
+            questions = new ArrayList<Questions>();
+            Questions quest = new Questions();
+            while (cursor.moveToNext()){
+                quest.setID(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_ID)));
+                quest.setQuestions(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_QUESTIONS)));
+                quest.setCorrectAnswers(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_CORRECT_ANSWER)));
+                String wrongAnsw123 = cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_WRONG_ANSWER1));
+                wrongAnsw123 += "||" + cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_WRONG_ANSWER2));
+                wrongAnsw123 += "||" + cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.QUEST_WRONG_ANSWER3));
+                quest.setWrongAnswers(wrongAnsw123);
+                questions.add(quest);
+                result++;
+            }
+        }
+        //return questions;
+        return result;
+    }
 }

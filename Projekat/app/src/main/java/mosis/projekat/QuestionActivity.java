@@ -32,7 +32,7 @@ import java.util.ArrayList;
 
 public class QuestionActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.137.174:8081";
+    private String ipAddress = "http://192.168.137.225:8081";
 
     private int numberOfQuestion = 5;
     private int questionNumber = 0;
@@ -394,8 +394,8 @@ public class QuestionActivity extends AppCompatActivity {
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_checkuser
                 // 192.168.137.162:8081
-                response = CustomHttpClient.executeHttpPost(ipAddress + "/process_newquestion", postParameters);
-                res=response.toString();
+                res = CustomHttpClient.executeHttpPost(ipAddress + "/process_newquestion", postParameters);
+                res=res.toString();
                 res = res.trim();
                 //res= res.replaceAll("\\s+","");
                 Thread.sleep(2000);
