@@ -3,17 +3,17 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/nav_camera"
+            android:id="@+id/nav_bluetooth"
             android:icon="@drawable/ic_menu_camera"
             android:title="Bluetooth" />
         <item
             android:id="@+id/nav_gallery"
             android:icon="@drawable/ic_menu_gallery"
-            android:title="Gallery" />
+            android:title="Rank list" />
         <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_menu_slideshow"
-            android:title="Slideshow" />
+            android:title="Start/stop service" />
         <item
             android:id="@+id/nav_manage"
             android:icon="@drawable/ic_menu_manage"
@@ -25,11 +25,11 @@
             <item
                 android:id="@+id/nav_viewprofile"
                 android:icon="@drawable/ic_menu_share"
-                android:title="View profile" />
+                android:title="Edit profile" />
             <item
                 android:id="@+id/nav_settings"
                 android:icon="@drawable/ic_menu_manage"
-                android:title="Settings" />
+                android:title="Delete profile" />
             <item
                 android:id="@+id/nav_logout"
                 android:icon="@drawable/ic_menu_manage"

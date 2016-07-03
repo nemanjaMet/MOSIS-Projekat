@@ -16,7 +16,36 @@
         android:background="@android:color/holo_blue_dark"
         android:layout_alignParentLeft="true"
         android:layout_alignParentTop="true"
+        android:visibility="gone"
         >
     </ListView>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/bluetooth_layout">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:text="Found Devices"
+            android:id="@+id/tvPD"
+            />
+        <ListView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/listView_bluetooth"
+            android:layout_above="@+id/bConnectNew"
+            android:layout_below="@+id/tvPD"
+            />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Find Devices"
+            android:id="@+id/bConnectNew"
+            android:layout_alignParentBottom="true"
+            />
+    </RelativeLayout>
 
 </RelativeLayout>

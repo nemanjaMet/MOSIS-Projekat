@@ -626,9 +626,11 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
         username: req.body.username,
         friends: req.body.friends, // salje se username prijatelja
         longitude: req.body.longitude,
-        latitude: req.body.latitude
+        latitude: req.body.latitude,
+        queryNearCategory: req.body.queryNearCategory
     };
 
+    console.log(response.queryNearCategory);
     //console.log(response);
 
     var userloc = {
@@ -666,14 +668,54 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
     { 
         //res.send(JSON.stringify(friendsloc));
         //console.log("Friends loc sending: " + JSON.stringify(friendsloc));
-        res.send(friendsloc);
+        if (response.queryNearCategory = "undefined")
+            res.send(friendsloc);
+        else
+        {
+            nearCategories(response.queryNearCategory, function(result) {
+                //console.log("Result from function: " + result);
+                res.send(JSON.stringify(friendsloc) + "|&&|" + result);
+            });
+        }
     }
     else
     {
         //console.log("No friends sending: nofriends");
-        res.send("noFriends");
+        if (response.queryNearCategory = "undefined")
+            res.send("noFriends");
+        else
+        {
+            nearCategories(response.queryNearCategory, function(result) {
+                //console.log("Result from function: " + result);
+                res.send( "noFriends" + "|&&|" + result);
+            });
+        }
     }
 });
+
+
+function nearCategories(query, callback){
+    var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+            db.all(query, function (err, rows) {
+                 if (err) {
+                console.log(err.message);
+                callback("categoriesError")
+                return;
+            }
+                     var broj = 0;
+                        rows.forEach(function (row) {
+                            broj++;
+                           // break;
+                        });
+                        if (broj > 0)
+                            callback(JSON.stringify(rows));
+                        else
+                            callback("noCategories");
+            });
+        });
+        db.close();
+}
 
 
 var server = http.listen(process.env.PORT || 8081, function () {

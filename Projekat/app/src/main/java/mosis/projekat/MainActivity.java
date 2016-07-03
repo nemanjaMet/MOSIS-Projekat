@@ -108,8 +108,8 @@ public class MainActivity extends AppCompatActivity
     Questions questions;
     private View mCustomMarkerView;
     private ImageView mMarkerImageView;
-    private String ImageUrl = "";
-    private Circle mCircle;
+    //private String ImageUrl = "";
+    //private Circle mCircle;
     private int correctAnswered = 0;
 
     protected void createLocationRequest() {
@@ -392,8 +392,11 @@ public class MainActivity extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_camera) {
-            // Handle the camera action
+        if (id == R.id.nav_bluetooth) {
+            Intent i = new Intent(MainActivity.this, ActivityList.class);
+            i.putExtra("myUsername", myUsername);
+            i.putExtra("myFriends", friendsUsernames);
+            startActivityForResult(i, 1);
         } else if (id == R.id.nav_gallery) {
 
         } else if (id == R.id.nav_slideshow) {
@@ -1257,6 +1260,7 @@ public class MainActivity extends AppCompatActivity
 
         CircleOptions circleOptions = new CircleOptions().center(position).radius(radiusInMeters).fillColor(shadeColor)
                 .strokeColor(strokeColor).strokeWidth(2);
+        Circle mCircle;
         mCircle = mMap.addCircle(circleOptions);
     }
 
@@ -1344,7 +1348,7 @@ public class MainActivity extends AppCompatActivity
                         friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE*/
                     questionNumber = 0;
                     numberOfQuestion = 5;
-                    mCircle = null;
+                    //mCircle = null;
                 }
                 else
                 {
@@ -1559,7 +1563,7 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    private double[] getBoundingBox(final double pLatitude, final double pLongitude, final int pDistanceInMeters) {
+    public static double[] getBoundingBox(final double pLatitude, final double pLongitude, final int pDistanceInMeters) {
 
         final double[] boundingBox = new double[4];
 
