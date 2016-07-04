@@ -3,9 +3,13 @@ package mosis.projekat;
 import android.Manifest;
 import android.app.Activity;
 import android.app.Dialog;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -22,6 +26,7 @@ import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.util.ArrayMap;
 import android.support.v7.app.AlertDialog;
 import android.util.Base64;
@@ -96,7 +101,7 @@ public class MainActivity extends AppCompatActivity
     LocationRequest mLocationRequest;
     GoogleApiClient mGoogleApiClient;
     Location mCurrentLocation;
-    String mLastUpdateTime;
+    //String mLastUpdateTime;
     ProjekatDBAdapter dbAdapter;
     //private ArrayList<User> friendsAvatar;
     private ArrayMap<String, Bitmap> friendsAvatar;
@@ -111,6 +116,7 @@ public class MainActivity extends AppCompatActivity
     //private String ImageUrl = "";
     //private Circle mCircle;
     private int correctAnswered = 0;
+    private boolean serviceOn = false;
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -306,6 +312,26 @@ public class MainActivity extends AppCompatActivity
         super.onStart();
         Log.d(TAG, "onStart fired............");
         mGoogleApiClient.connect();
+        serviceOn = ServiceSendMyLoc.serviceRunning;
+
+        if (!serviceOn)
+        {
+            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+            Menu menu = navigationView.getMenu();
+            MenuItem nav_gallery = menu.findItem(R.id.nav_service);
+            nav_gallery.setTitle("Start service");
+            navigationView.setNavigationItemSelectedListener(this);
+        }
+        else
+        {
+            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+            Menu menu = navigationView.getMenu();
+            MenuItem nav_gallery = menu.findItem(R.id.nav_service);
+            nav_gallery.setTitle("Stop service");
+            navigationView.setNavigationItemSelectedListener(this);
+            // ako je servis ukljucen onda ga iskljuci
+            turnServiceOnOff();
+        }
     }
 
     @Override
@@ -320,6 +346,12 @@ public class MainActivity extends AppCompatActivity
     protected void onPause() {
         super.onPause();
         stopLocationUpdates();
+
+        // ako je servis treba da bude ukljucen onda ga ukljuci
+        if (serviceOn)
+        {
+            turnServiceOnOff();
+        }
     }
 
     @Override
@@ -363,7 +395,17 @@ public class MainActivity extends AppCompatActivity
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_get_categories) {
+
+            String query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from CategoryQuestions where ";
+
+            double [] boundingBox = getBoundingBox(myLoc.latitude, myLoc.longitude, categoryShowRadius);
+
+            query += " AND LatitudeCategory > '" + Double.toString(boundingBox[0]) + "' ";
+            query += "AND LongitudeCategory > '" + Double.toString(boundingBox[1]) + "' ";
+            query += "AND LatitudeCategory < '" + Double.toString(boundingBox[2]) + "' ";
+            query += "AND LongitudeCategory < '" + Double.toString(boundingBox[3]) + "' ";
+
             GetCategoryTask mCategoryTask;
             mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, "");
             //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
@@ -373,14 +415,6 @@ public class MainActivity extends AppCompatActivity
         {
             Intent i = new Intent(MainActivity.this, SearchActivity.class);
             startActivityForResult(i, 1);
-        }
-        else if (id == R.id.action_show_list)
-        {
-            Intent i = new Intent(MainActivity.this, ActivityList.class);
-            startActivityForResult(i, 1);
-            /*Intent i = new Intent(MainActivity.this, GameActivity.class);
-            i.putExtra("showList", "true");
-            startActivityForResult(i, 1);*/
         }
 
         return super.onOptionsItemSelected(item);
@@ -397,23 +431,107 @@ public class MainActivity extends AppCompatActivity
             i.putExtra("myUsername", myUsername);
             i.putExtra("myFriends", friendsUsernames);
             startActivityForResult(i, 1);
-        } else if (id == R.id.nav_gallery) {
+        }
+        else if (id == R.id.nav_service) {
 
-        } else if (id == R.id.nav_slideshow) {
+            //turnServiceOnOff();
+            if (serviceOn)
+            {
+                NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+                Menu menu = navigationView.getMenu();
+                MenuItem nav_gallery = menu.findItem(R.id.nav_service);
+                nav_gallery.setTitle("Start service");
+                navigationView.setNavigationItemSelectedListener(this);
+                serviceOn = false;
+            }
+            else
+            {
+                NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+                Menu menu = navigationView.getMenu();
+                MenuItem nav_gallery = menu.findItem(R.id.nav_service);
+                nav_gallery.setTitle("Stop service");
+                navigationView.setNavigationItemSelectedListener(this);
+                serviceOn = true;
+            }
+        } else if (id == R.id.nav_show_rank_list) {
+            Intent i = new Intent(MainActivity.this, ActivityList.class);
+            startActivityForResult(i, 1);
 
-        } else if (id == R.id.nav_manage) {
+        } else if (id == R.id.nav_edit_profile) {
 
-        } else if (id == R.id.nav_viewprofile) {
-
-        } else if (id == R.id.nav_settings) {
+        } else if (id == R.id.nav_delete_profile) {
+            AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                    .setMessage("\n\nAre you shure you want to delete this account ?" )
+                    .setCancelable(false)
+                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which)
+                        {
+                            DeleteProfileTask deleteMe;
+                            deleteMe = new DeleteProfileTask(myUsername);
+                            deleteMe.execute();
+                        }
+                    })
+                    .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which)
+                        {
+                            // Perform Your Task Here--When No is pressed
+                            dialog.cancel();
+                        }
+                    }).show();
 
         } else if (id == R.id.nav_logout) {
-
+            SharedPreferences settings = getApplicationContext().getSharedPreferences(LoginActivity.PREFS_NAME, Context.MODE_PRIVATE);
+            settings.edit().clear().commit();
+            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+            startActivity(intent);
+            finish();
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    private void turnServiceOnOff()
+    {
+        if (ServiceSendMyLoc.serviceRunning)
+        {
+                /*Context context = getApplicationContext();
+                Intent serviceIntent = new Intent(ServiceSendMyLoc.class.getName());
+                context.stopService(serviceIntent);*/
+
+            Intent serviceIntent = new Intent(getBaseContext(), ServiceSendMyLoc.class);
+            stopService(serviceIntent);
+
+            /*Toast.makeText(MainActivity.this, "Service stopped!", Toast.LENGTH_LONG).show();
+
+            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+            Menu menu = navigationView.getMenu();
+            MenuItem nav_gallery = menu.findItem(R.id.nav_service);
+            nav_gallery.setTitle("Start service");
+            navigationView.setNavigationItemSelectedListener(this);*/
+        }
+        else
+        {
+                /*Context context = getApplicationContext();
+                Intent serviceIntent = new Intent(ServiceSendMyLoc.class.getName());
+                serviceIntent.putExtra("myUsername", myUsername);
+                serviceIntent.putExtra("friendsUsernames", friendsUsernames);
+                context.startService(serviceIntent);*/
+
+            Intent serviceIntent = new Intent(getBaseContext(), ServiceSendMyLoc.class);
+            serviceIntent.putExtra("myUsername", myUsername);
+            serviceIntent.putExtra("friendsUsernames", friendsUsernames);
+            startService(serviceIntent);
+
+            /*Toast.makeText(MainActivity.this, "Service started!", Toast.LENGTH_LONG).show();
+
+            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+            Menu menu = navigationView.getMenu();
+            MenuItem nav_gallery = menu.findItem(R.id.nav_service);
+            nav_gallery.setTitle("Stop service");
+            navigationView.setNavigationItemSelectedListener(this);*/
+        }
     }
 
     @Override
@@ -498,7 +616,7 @@ public class MainActivity extends AppCompatActivity
 
         Log.d(TAG, "Firing onLocationChanged....................");
         mCurrentLocation = location;
-        mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+        //mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
         updateLocation();
 
        /* // Getting latitude of the current location
@@ -1653,5 +1771,51 @@ public class MainActivity extends AppCompatActivity
 
             }
         }*/
+    }
+
+    public class DeleteProfileTask extends AsyncTask<Void, Void, String> {
+
+        private final String mUsername;
+
+        DeleteProfileTask(String username) {
+            mUsername = username;
+        }
+
+        protected String doInBackground(Void... params) {
+            // TODO: attempt authentication against a network service.
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("username", mUsername ));
+            String resDeletedProfile = null;
+            try {
+                resDeletedProfile = CustomHttpClient.executeHttpPost(ipAddress + "/process_deleteuser", postParameters);
+                resDeletedProfile = resDeletedProfile.trim();
+
+            } catch (InterruptedException e) {
+                return "Error";
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "Error";
+            }
+
+            //return response;
+            return resDeletedProfile;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+
+            if (result.equals("success"))
+            {
+                Toast.makeText(getApplicationContext(), "Account deleted!", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+                startActivity(intent);
+                finish();
+            }
+            else
+            {
+                Toast.makeText(getApplicationContext(), "Error with deleting account!", Toast.LENGTH_SHORT).show();
+            }
+
+        }
     }
 }

@@ -4,35 +4,31 @@
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/nav_bluetooth"
-            android:icon="@drawable/ic_menu_camera"
-            android:title="Bluetooth" />
+            android:icon="@mipmap/ic_add_new_friend"
+            android:title="Add new friend" />
         <item
-            android:id="@+id/nav_gallery"
-            android:icon="@drawable/ic_menu_gallery"
+            android:id="@+id/nav_show_rank_list"
+            android:icon="@mipmap/ic_show_rank_list"
             android:title="Rank list" />
         <item
-            android:id="@+id/nav_slideshow"
-            android:icon="@drawable/ic_menu_slideshow"
+            android:id="@+id/nav_service"
+            android:icon="@mipmap/ic_start_stop_service"
             android:title="Start/stop service" />
-        <item
-            android:id="@+id/nav_manage"
-            android:icon="@drawable/ic_menu_manage"
-            android:title="Tools" />
     </group>
 
-    <item android:title="Communicate">
+    <item android:title="Profile">
         <menu>
             <item
-                android:id="@+id/nav_viewprofile"
-                android:icon="@drawable/ic_menu_share"
+                android:id="@+id/nav_edit_profile"
+                android:icon="@mipmap/ic_edit_profile"
                 android:title="Edit profile" />
             <item
-                android:id="@+id/nav_settings"
-                android:icon="@drawable/ic_menu_manage"
+                android:id="@+id/nav_delete_profile"
+                android:icon="@mipmap/ic_delete_profile"
                 android:title="Delete profile" />
             <item
                 android:id="@+id/nav_logout"
-                android:icon="@drawable/ic_menu_manage"
+                android:icon="@mipmap/ic_logout"
                 android:title="Logout" />
         </menu>
     </item>

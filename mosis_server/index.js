@@ -66,6 +66,21 @@ db.close();
 // Create application/x-www-form-urlencoded parser
 var urlencodedParser = bodyParser.urlencoded({ extended: false })
 
+app.post('/process_deleteuser', urlencodedParser, function(req, res){
+    var response = {
+        username: req.body.username
+    };
+
+    var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function(){
+/////////prva funkcija treba da vidi u tabeli friendship da li je ovaj username prijatelj nekom drugom i da ga izbrise, a druga brise samog korisnika!!!!////////////
+        db.run("DELETE from Friendship where User1= '"+ response.username + "'" + "|| User2='"+ response.username + "'");
+        db.run("DELETE from User where Username = '"+ response.username + "'");
+        res.send("success");
+    });
+     db.close();
+});
+
 app.post('/process_addPoints', urlencodedParser, function (req, res) {
     console.log("Adding points...");
     // Prepare output in JSON format
@@ -668,7 +683,7 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
     { 
         //res.send(JSON.stringify(friendsloc));
         //console.log("Friends loc sending: " + JSON.stringify(friendsloc));
-        if (response.queryNearCategory = "undefined")
+        if (typeof(response.queryNearCategory) == "undefined")
             res.send(friendsloc);
         else
         {
@@ -681,7 +696,7 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
     else
     {
         //console.log("No friends sending: nofriends");
-        if (response.queryNearCategory = "undefined")
+        if (typeof(response.queryNearCategory) == "undefined")
             res.send("noFriends");
         else
         {

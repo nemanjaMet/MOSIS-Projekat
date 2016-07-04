@@ -1,7 +1,11 @@
 package mosis.projekat;
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -13,6 +17,7 @@ import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -40,10 +45,12 @@ import org.apache.http.message.BasicNameValuePair;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 public class ServiceSendMyLoc extends Service implements LocationListener, GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener {
 
+    public static Boolean serviceRunning = false;
     private String ipAddress = "http://192.168.137.225:8081";
     LocationRequest mLocationRequest;
     GoogleApiClient mGoogleApiClient;
@@ -53,9 +60,11 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
     String friendsUsernames;
     private LatLng myLoc;
     private UpdateLocTask mAuthTask = null;
-    private static final long INTERVAL = 1000 * 10;
-    private static final long FASTEST_INTERVAL = 1000 * 5;
+    private static final long INTERVAL = 1000 * 30;
+    private static final long FASTEST_INTERVAL = 1000 * 20;
     private int radiusNearLocation = 100; // meters
+    private LatLng myLastLocNotification;
+    private List<String> myLastFriendsLoc;
 
 
     public ServiceSendMyLoc() {
@@ -79,6 +88,8 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
 
         myUsername = intent.getStringExtra("myUsername");
         friendsUsernames = intent.getStringExtra("friendsUsernames");
+
+        serviceRunning = true;
 
         return START_STICKY;
     }
@@ -149,7 +160,7 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
         Log.d("Service: ", "Firing onLocationChanged..............................................");
         mCurrentLocation = location;
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        //updateLocation();
+        updateLocation();
     }
 
     @Override
@@ -236,6 +247,113 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
             {
 
             }*/
+            if (result.contains("|&&|"))
+            {
+                String [] friendsCategories = result.split("\\|&&\\|");
+
+                if (friendsCategories[0].contains("Username"))
+                {
+
+                    Gson gson = new Gson();
+                    JsonArray jsonArray = new JsonParser().parse(friendsCategories[0]).getAsJsonArray();
+                    User user = new User();
+
+                    if (myLastFriendsLoc.size() > 0)
+                    {
+                        for (int i=0; i < myLastFriendsLoc.size() && i > -1; i++)
+                        {
+                            if (!friendsCategories[0].contains('"' + myLastFriendsLoc.get(i) + '"'))
+                            {
+                                myLastFriendsLoc.remove(i);
+                                i--;
+                            }
+                        }
+                    }
+
+                    boolean showNotification = false;
+
+                    for (int i = 0; i < jsonArray.size(); i++) {
+                        JsonElement str = jsonArray.get(i);
+                        user = gson.fromJson(str, User.class);
+
+                        Double lat = Double.parseDouble(user.getLatitude());
+                        Double lon = Double.parseDouble(user.getLongitude());
+
+                        float meters[] = new float[1];
+                        Location.distanceBetween(lat, lon, myLoc.latitude, myLoc.longitude, meters);
+                        if (meters[0] <= radiusNearLocation) {
+                            // Near Friend
+                            //break;
+
+                            if (myLastFriendsLoc.size() > 0)
+                            {
+                                if (!myLastFriendsLoc.contains(user.getUsername()))
+                                {
+                                    showNotification = true;
+                                    myLastFriendsLoc.add(user.getUsername());
+                                }
+                            }
+                            else
+                            {
+                                showNotification = true;
+                                myLastFriendsLoc.add(user.getUsername());
+
+                            }
+
+
+                        }
+                    }
+
+                    if (showNotification)
+                    {
+                        // Prikazi notifikaciju
+                        showNotification("Near your friend!", "Click to see what friend", R.mipmap.ic_launcher_friends);
+                    }
+
+                }
+
+                if (friendsCategories[1].contains("Category"))
+                {
+                    Gson gson = new Gson();
+                    JsonArray jsonArray = new JsonParser().parse(friendsCategories[1]).getAsJsonArray();
+                    Questions questionsCategory = new Questions();
+
+                    for (int i = 0; i < jsonArray.size(); i++) {
+                        JsonElement str = jsonArray.get(i);
+                        questionsCategory = gson.fromJson(str, Questions.class);
+
+                        Double lat = Double.parseDouble(questionsCategory.getLatitudeCategory());
+                        Double lon = Double.parseDouble(questionsCategory.getLongitudeCategory());
+                        //LatLng categoryLatLng = new LatLng(lat, lon);
+
+                        float meters[] = new float[1];
+                        Location.distanceBetween(lat, lon, myLoc.latitude, myLoc.longitude, meters);
+                        if (meters[0] <= radiusNearLocation) {
+                            // Near categories
+                            if (myLastLocNotification == null)
+                            {
+                                // prikazi notifikaciju
+                                myLastLocNotification = myLoc;
+                                showNotification("Near category!", "Click to see what category", R.drawable.ic_question_marker);
+                                break;
+                            }
+                            else
+                            {
+                                Location.distanceBetween(myLastLocNotification.latitude, myLastLocNotification.longitude, myLoc.latitude, myLoc.longitude, meters);
+                                if (meters[0] > radiusNearLocation)
+                                {
+                                    // prikazi notifikaciju
+                                    myLastLocNotification = myLoc;
+                                    showNotification("Near category!", "Click to see what category", R.drawable.ic_question_marker);
+                                    break;
+                                }
+                            }
+
+
+                        }
+                    }
+                }
+            }
 
         }
 
@@ -243,6 +361,31 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
         protected void onCancelled() {
             mAuthTask = null;
         }
+    }
+
+    @Override
+    public void onDestroy()
+    {
+        serviceRunning = false;
+        mGoogleApiClient.disconnect();
+    }
+
+    public void showNotification(String title, String text, int icon)
+    {
+        NotificationCompat.Builder mBuilder =   new NotificationCompat.Builder(this)
+                .setSmallIcon(icon) // notification icon
+                .setContentTitle(title) // title for notification
+                .setContentText(text) // message for notification
+                .setAutoCancel(true); // clear notification after click
+
+        mBuilder.setDefaults(Notification.DEFAULT_ALL);
+
+        Intent intent = new Intent(this, MainActivity.class);
+        PendingIntent pi = PendingIntent.getActivity(this,0,intent,PendingIntent.FLAG_UPDATE_CURRENT);
+        mBuilder.setContentIntent(pi);
+        NotificationManager mNotificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationManager.notify(0, mBuilder.build());
     }
 
 }

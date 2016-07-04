@@ -4,7 +4,9 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -78,13 +80,22 @@ public class LoginActivity extends AppCompatActivity {
     private View mLoginFormView;
     String response = null;
 
+    public static final String PREFS_NAME = "preferences";
+    private static final String PREF_UNAME = "Username";
+
+    private final String DefaultUnameValue = "";
+    private String UnameValue;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getSupportActionBar().hide(); //<< this
         setContentView(R.layout.activity_login);
         // Set up the login form.
         mUsernameView = (EditText) findViewById(R.id.username);
         mPasswordView = (EditText) findViewById(R.id.password);
+
+        loadPreferences();
 
         // zakomentarisano radi testiranja glavne forme
         mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -283,6 +294,7 @@ public class LoginActivity extends AppCompatActivity {
                 /*Intent i = new Intent(LoginActivity.this, MainActivity.class);
                 startActivity(i);*/
                 // slanje username-a glavnoj formi
+                savePreferences(mUsernameView.getText().toString());
                 Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                 intent.putExtra("username", mUsernameView.getText().toString());
                 startActivity(intent);
@@ -328,6 +340,7 @@ public class LoginActivity extends AppCompatActivity {
                 result = result.trim();
                 if (!result.isEmpty())
                 {
+                    savePreferences(result);
                     Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                     intent.putExtra("username", result);
                     startActivity(intent);
@@ -347,6 +360,36 @@ public class LoginActivity extends AppCompatActivity {
             }
         }
     }//onActivityResult*/
+
+
+    private void savePreferences(String usernameToSave) {
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME,
+                Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = settings.edit();
+
+        // Edit and commit
+        UnameValue = usernameToSave;
+        editor.putString(PREF_UNAME, UnameValue);
+        editor.commit();
+    }
+
+    private void loadPreferences() {
+
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME,
+                Context.MODE_PRIVATE);
+
+        // Get value
+        UnameValue = settings.getString(PREF_UNAME, DefaultUnameValue);
+
+
+        if (UnameValue != null && !UnameValue.isEmpty() && UnameValue.length() > 0)
+        {
+            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+            intent.putExtra("username", UnameValue);
+            startActivity(intent);
+            finish();
+        }
+    }
 
 }
 

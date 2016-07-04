@@ -26,9 +26,8 @@
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
-    <string name="action_settings">Show all categories</string>
+    <string name="action_show_categories">Show all categories</string>
     <string name="action_search_category">Search categories</string>
-    <string name="action_show_list">Show list</string>
     <string name="hint_longitude">Longitude</string>
     <!--<string name="permission_rationale">"Contacts permissions are needed for providing email
         completions."
