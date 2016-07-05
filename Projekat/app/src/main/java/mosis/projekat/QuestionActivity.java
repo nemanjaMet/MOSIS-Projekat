@@ -32,7 +32,7 @@ import java.util.ArrayList;
 
 public class QuestionActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.137.225:8081";
+    private String ipAddress = "http://192.168.0.103:8081";
 
     private int numberOfQuestion = 5;
     private int questionNumber = 0;
@@ -147,7 +147,7 @@ public class QuestionActivity extends AppCompatActivity {
         {
             questNumb = Integer.parseInt(questionClicked) - 1;
 
-            String status = String.valueOf(questNumb) + "/" + String.valueOf(numberOfQuestion) + " questions";
+            String status = String.valueOf(questNumb+1) + "/" + String.valueOf(numberOfQuestion) + " questions";
             boolean finded = false;
             int i = 0;
             while (!finded) {
@@ -156,6 +156,7 @@ public class QuestionActivity extends AppCompatActivity {
                     finded = true;
                 i++;
             }
+            btn_nextQuest.setText("Save");
             et_question_status.clearFocus();
             et_question_status.setHint("H");
             et_question_status.setFocusable(false);

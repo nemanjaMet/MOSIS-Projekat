@@ -44,7 +44,7 @@ import java.util.Date;
 
 public class RegisterActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.137.225:8081";
+    private String ipAddress = "http://192.168.0.103:8081";
 
     private static final int SELECT_PICTURE = 100;
     private ImageButton selectImage;

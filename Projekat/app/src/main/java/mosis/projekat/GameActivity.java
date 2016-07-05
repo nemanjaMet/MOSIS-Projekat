@@ -40,7 +40,7 @@ import java.util.Random;
 
 public class GameActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.137.225:8081";
+    private String ipAddress = "http://192.168.0.103:8081";
 
     String questionPoints = "5";
     private RadioGroup radioGroup;

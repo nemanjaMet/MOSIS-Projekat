@@ -51,7 +51,7 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
         GoogleApiClient.OnConnectionFailedListener {
 
     public static Boolean serviceRunning = false;
-    private String ipAddress = "http://192.168.137.225:8081";
+    private String ipAddress = "http://192.168.0.103:8081";
     LocationRequest mLocationRequest;
     GoogleApiClient mGoogleApiClient;
     Location mCurrentLocation;

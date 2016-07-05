@@ -1,5 +1,6 @@
 package mosis.projekat;
 
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
@@ -13,6 +14,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.SyncStateContract;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AlertDialog;
@@ -47,13 +49,15 @@ import java.util.UUID;
 
 public class ActivityList extends AppCompatActivity implements AdapterView.OnItemClickListener {
 
-    private String ipAddress = "http://192.168.137.225:8081";
+    private String ipAddress = "http://192.168.0.103:8081";
 
     private GetScoreListTask mGetScoreListTask = null;
     public static final String FIRST_COLUMN="Position";
     public static final String SECOND_COLUMN="Username";
     public static final String THIRD_COLUMN="Points";
     private ArrayList<HashMap<String, String>> list;
+    public static final int MESSAGE_DEVICE_NAME = 4;
+    public static final String DEVICE_NAME = "device_name";
     private int numberOfRows = 10;
     private int pageNumber = 0;
     private int lastGoodPageNumber = 0;
@@ -78,6 +82,7 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
     String myUsername;
     String myFriends;
     boolean bluetoothActivity = false;
+    private static final int ENABLE_BT_REQUEST_CODE = 1;
     // ----------------------------------------------------------- //
 
     @Override
@@ -304,14 +309,25 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
+           /* byte[] writeBuf = (byte[]) msg.obj;
+            int begin = (int)msg.arg1;
+            int end = (int)msg.arg2;*/
+
             switch(msg.what){
                 case SUCCESS_CONNECT:
                     //Do something
                     ConnectedThread connectedThread = new ConnectedThread((BluetoothSocket)msg.obj);
                     Toast.makeText(getApplicationContext(), "CONNECT", Toast.LENGTH_SHORT).show();
-                    String s = "successfully connected";// ovo saljemo preko handlera!!
-                    connectedThread.write(s.getBytes());
+                    Message msg1 = mHandler.obtainMessage(MESSAGE_DEVICE_NAME);
+                    Bundle bundle = new Bundle();
+                    bundle.putString(DEVICE_NAME, "HTC");
+                    msg.setData(bundle);
+                    mHandler.sendMessage(msg);
                     Log.i(tag, "connected");
+
+                    //String writeMessage = new String(writeBuf);
+                    //writeMessage = writeMessage.substring(begin, end);
+
                     break;
                 case MESSAGE_READ:
                     byte[] readBuf = (byte[])msg.obj;
@@ -331,7 +347,7 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
     private void discoverableBT() {
         Intent discoverableIntent = new Intent(btAdapter.ACTION_REQUEST_DISCOVERABLE);
         discoverableIntent.putExtra(btAdapter.EXTRA_DISCOVERABLE_DURATION, 0);
-        startActivity(discoverableIntent);
+        startActivityForResult(discoverableIntent,ENABLE_BT_REQUEST_CODE );
     }
 
     //private void turnOnBT() {//Funkcija kojom se ukljucuje BT!!!
@@ -423,11 +439,14 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
                 btAdapter.cancelDiscovery();
                 Toast.makeText(this, "Paused", Toast.LENGTH_SHORT).show();
                 super.onPause();
-                // unregisterReceiver(reciver);
+                unregisterReceiver(reciver);
             } else {
                 Toast.makeText(this, "Paused else", Toast.LENGTH_SHORT).show();
+
+                ////////////////////////////////////////////////////////////////////////////////////
+                //unregisterReceiver(reciver);// da ne bi crashovala app mora da se reciever unregistruje || EOA TU CRASHUJE ! :D
+                /////////////////////////////////////////////////////////////////////////////////////
                 super.onPause();
-                unregisterReceiver(reciver);// da ne bi crashovala app mora da se reciever unregistruje
             }
         }
         else
@@ -444,12 +463,13 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
             if (clicked) {
                 btAdapter.cancelDiscovery();
                 Toast.makeText(this, "Stopped", Toast.LENGTH_SHORT).show();
-                super.onStop();
                 unregisterReceiver(reciver);
+                super.onStop();
+
             } else {
                 Toast.makeText(this, "Stopped else", Toast.LENGTH_SHORT).show();
                 super.onStop();
-                unregisterReceiver(reciver);
+                //unregisterReceiver(reciver);
             }
         }
         else
@@ -480,11 +500,12 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
             if (clicked) {
                 btAdapter.cancelDiscovery();
                 Toast.makeText(this, "Destroyed", Toast.LENGTH_SHORT).show();
-                super.onDestroy();
                 unregisterReceiver(reciver);
+                super.onDestroy();
+
             } else {
+                //unregisterReceiver(reciver);
                 super.onDestroy();
-                unregisterReceiver(reciver);
             }
         }
         else
@@ -498,7 +519,16 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
         super.onActivityResult(requestCode, resultCode, data);
         if(resultCode == RESULT_CANCELED){
             Toast.makeText(getApplicationContext(), "Bluetooth must be enabled to continue",Toast.LENGTH_SHORT).show();
+            Intent returnIntent = new Intent(ActivityList.this, MainActivity.class);
+            setResult(RESULT_CANCELED, returnIntent);
             finish();
+        }
+        else if(requestCode == ENABLE_BT_REQUEST_CODE)
+        {
+            if(resultCode == Activity.RESULT_OK){
+                AcceptThread t = new AcceptThread();
+                t.start();
+            }
         }
     }
 
@@ -510,12 +540,19 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
         //POPRAVI ME PLSTY SSTY!!!!!
         if(listAdapter.getItem(position).contains("Paired")){//ovde ide kod za razmenu usernama!!!!
 
-            BluetoothDevice selectedDevice = devices.get(position);// uredjaj na listi na koji je kliknuto!!!!
-            ConnectThread connect = new ConnectThread(selectedDevice);
-            connect.start();
+            //BluetoothDevice selectedDevice = devices.get(position);// uredjaj na listi na koji je kliknuto!!!!
+            //ConnectThread connect = new ConnectThread(selectedDevice);
+            //connect.start();
             //naredna funkcija treba zasebno valjda!!!!!
             //AcceptThread connects = new AcceptThread();
             //connects.run();
+
+            String  itemValue = (String) listView.getItemAtPosition(position);
+            String MAC = itemValue.substring(itemValue.length() - 17);
+            BluetoothDevice bluetoothDevice = btAdapter.getRemoteDevice(MAC);
+            // Initiate a connection request in a separate thread
+            ConnectThread t = new ConnectThread(bluetoothDevice);
+            t.start();
         }
         else {// umesto ovoga kad se klikene treba da se upare uredjaji!!!
             Toast.makeText(getApplicationContext(), "device is not paired", Toast.LENGTH_SHORT).show();
@@ -523,6 +560,13 @@ public class ActivityList extends AppCompatActivity implements AdapterView.OnIte
             // BluetoothDevice selectedDevice = (BluetoothDevice)o[position];
             // ConnectThread connect = new ConnectThread(selectedDevice);
             // connect.start();
+
+            String  itemValue = (String) listView.getItemAtPosition(position);
+            String MAC = itemValue.substring(itemValue.length() - 17);
+            BluetoothDevice bluetoothDevice = btAdapter.getRemoteDevice(MAC);
+            // Initiate a connection request in a separate thread
+            ConnectThread t = new ConnectThread(bluetoothDevice);
+            t.start();
 
         }
     }

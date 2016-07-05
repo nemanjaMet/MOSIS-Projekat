@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback,  com.google.android.gms.location.LocationListener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, GoogleMap.OnMarkerClickListener {
 
-    private String ipAddress = "http://192.168.137.225:8081";
+    private String ipAddress = "http://192.168.0.103:8081";
     private  int categoryShowRadius = 250;
     private double categoryRadius = 250.0; // u metrima
     private double questionRadius = 50.0; // u metrima
@@ -1408,6 +1408,12 @@ public class MainActivity extends AppCompatActivity
                     questions.setCorrectAnswers(data.getStringExtra("correctAnswer"));
                     questions.setWrongAnswers(data.getStringExtra("wrongAnswer"));
                     questions.setLongitudeLatitude(Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.latitude));
+
+                    if (questionNumber-1 == numberOfQuestion)
+                    {
+                        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+                        fab.setImageResource(R.drawable.ic_menu_send);
+                    }
                 }
                 else
                 {
@@ -1417,12 +1423,18 @@ public class MainActivity extends AppCompatActivity
                     questions.setCorrectAnswers(questions.getCorrectAnswers() + separate + data.getStringExtra("correctAnswer"));
                     questions.setWrongAnswers(questions.getWrongAnswers() + separate + data.getStringExtra("wrongAnswer"));
                     questions.setLongitudeLatitude(questions.getLongitudeLatitude() + separate + Double.toString(questionLatLng.longitude) + "," + Double.toString(questionLatLng.latitude));
+
+                    if (questionNumber-1 == numberOfQuestion)
+                    {
+                        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+                        fab.setImageResource(R.drawable.ic_menu_send);
+                    }
                 }
 
                 Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
                 Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
 
-                Marker friendMarker = mMap.addMarker(new MarkerOptions()
+                Marker questMarker = mMap.addMarker(new MarkerOptions()
                             .position(questionLatLng)
                             .title(Integer.toString(questionNumber-1))
                             .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
@@ -1466,6 +1478,8 @@ public class MainActivity extends AppCompatActivity
                         friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE*/
                     questionNumber = 0;
                     numberOfQuestion = 5;
+                    FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+                    fab.setImageResource(android.R.drawable.ic_input_add);
                     //mCircle = null;
                 }
                 else

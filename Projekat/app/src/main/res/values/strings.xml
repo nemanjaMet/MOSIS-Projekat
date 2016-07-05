@@ -1,5 +1,11 @@
 <resources>
-    <string name="app_name">Projekat</string>
+    <string name="app_name">Look for the answer</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="action_register">Register</string>
+    <string name="title_activity_register">Register new profile</string>
+    <string name="title_activity_game">GameActivity</string>
+    <string name="title_activity_search">SearchActivity</string>
+    <string name="title_activity_activity_list">ActivityList</string>
 
     <!-- Strings related to login -->
     <string name="prompt_username">Username</string>
@@ -9,7 +15,6 @@
     <string name="prompt_lastname">Last name</string>
     <string name="prompt_phoneNumber">Phone number</string>
     <string name="action_sign_in">Sign in</string>
-    <string name="action_register">Register</string>
     <string name="action_createProfile">Create profile</string>
     <string name="action_sign_in_short">Sign in SHORT TEST</string>
     <string name="error_invalid_username">This username is invalid</string>
@@ -19,9 +24,8 @@
     <string name="error_invalid_password2">Confirm password is not correct</string>
     <string name="error_incorrect_password">This password is incorrect</string>
     <string name="error_field_required">This field is required</string>
-    <string name="title_activity_register">Register new profile</string>
     <string name="text_imageLabel">Select avatar</string>
-    <string name="title_activity_main">MainActivity</string>
+
 
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
@@ -46,16 +50,13 @@
         <item>History</item>
         <item>Sport</item>
     </string-array>
-    <string name="title_activity_game">GameActivity</string>
-    <string name="title_activity_search">SearchActivity</string>
+
     <string name="spinner_culture">Culture</string>
     <string name="spinner_cuisine">Cuisine</string>
     <string name="spinner_geography">Geography</string>
     <string name="spinner_history">History</string>
     <string name="spinner_sport">Sport</string>
-
     <string name="button_searchTxt">Search</string>
     <string name="radiusTxt">Radius (0-1000m)</string>
     <string name="search_username">Username who created category</string>
-    <string name="title_activity_activity_list">ActivityList</string>
 </resources>
