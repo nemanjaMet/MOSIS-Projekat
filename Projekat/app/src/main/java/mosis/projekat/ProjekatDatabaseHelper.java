@@ -21,6 +21,7 @@ public class ProjekatDatabaseHelper extends SQLiteOpenHelper {
             + ProjekatDBAdapter.LASTNAME + " text, "
             + ProjekatDBAdapter.PHONE_NUMBER + " text, "
             + ProjekatDBAdapter.IMAGE + " text, "
+            + ProjekatDBAdapter.TEAM_NAME + " text, "
             + ProjekatDBAdapter.CREATED + " text);";
 
     private static final String DATABASE_CREATE2 = "create table "
@@ -53,6 +54,18 @@ public class ProjekatDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE);
         db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE2);
         onCreate(db);
+    }
+
+    public void deleteDatabase(SQLiteDatabase db)
+    {
+        try {
+            db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE);
+            db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE2);
+            db.execSQL(DATABASE_CREATE);
+            db.execSQL(DATABASE_CREATE2);
+    } catch (SQLiteException ec){
+        Log.v("ProjekatDatabaseHelper", ec.getMessage());
+    }
     }
 
     public void dropCreateQuestions(SQLiteDatabase db)

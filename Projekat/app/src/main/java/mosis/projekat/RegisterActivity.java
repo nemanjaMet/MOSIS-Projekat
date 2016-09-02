@@ -13,17 +13,11 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.database.Cursor;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
-import android.support.design.widget.TextInputLayout;
-import android.support.v4.view.GravityCompat;
-import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Base64;
-import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
@@ -37,14 +31,13 @@ import org.apache.http.message.BasicNameValuePair;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 
 public class RegisterActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.0.103:8081";
+    //private String ipAddress = "http:/10.10.3.188:8081";
+    private String ipAddress = MainActivity.publicIpAddress;
 
     private static final int SELECT_PICTURE = 100;
     private ImageButton selectImage;
@@ -61,7 +54,7 @@ public class RegisterActivity extends AppCompatActivity {
     private View mProgressView;
     ProjekatDBAdapter dbAdapter;
     private boolean isMainActivity = false;
-
+    User myUser = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,37 +94,68 @@ public class RegisterActivity extends AppCompatActivity {
         Bundle p = getIntent().getExtras();
         if (p != null)
         {
-            String friendUsername =p.getString("friendUsername");
+            String friendUsername = p.getString("friendUsername");
+
+            boolean editProfile = false;
+            if (friendUsername == null)
+            {
+                friendUsername = p.getString("myUsername");
+                editProfile = true;
+            }
+
             dbAdapter.open();
             User friend = dbAdapter.getEntry(friendUsername);
             dbAdapter.close();
-            friend.setLongitude(String.valueOf(p.getDouble("longitude")));
-            friend.setLatitude(String.valueOf(p.getDouble("latitude")));
+
             isMainActivity = true;
 
-            TextView selectAvatar = (TextView)findViewById(R.id.imageLabel);
-            selectAvatar.setVisibility(View.INVISIBLE);
+            if (editProfile)
+            {
+                myUser = friend;
+                et_password.setText(friend.getPassword());
+                et_password2.setText(friend.getPassword());
+                registerButton.setText("Save profile");
+
+                registerButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        attemptCreateProfile();
+                    }
+                });
+                selectImage.setOnClickListener(new View.OnClickListener(){
+                    @Override
+                    public void onClick(View view) {
+                        openImageChooser();
+                    }
+                });
+            }
+            else {
+                friend.setLongitude(String.valueOf(p.getDouble("longitude")));
+                friend.setLatitude(String.valueOf(p.getDouble("latitude")));
+                TextView selectAvatar = (TextView) findViewById(R.id.imageLabel);
+                selectAvatar.setVisibility(View.INVISIBLE);
+                et_password.setHint(R.string.hint_longitude);
+                et_password.setEnabled(false);
+                et_password.setFocusable(false);
+                et_password.setInputType(InputType.TYPE_CLASS_TEXT);
+                et_password2.setEnabled(false);
+                et_password2.setFocusable(false);
+                et_password2.setInputType(InputType.TYPE_CLASS_TEXT);
+                et_password2.setHint("Latitude");
+                et_name.setEnabled(false);
+                et_name.setFocusable(false);
+                et_lastname.setEnabled(false);
+                et_lastname.setFocusable(false);
+                et_phonenumber.setEnabled(false);
+                et_phonenumber.setFocusable(false);
+                registerButton.setVisibility(View.INVISIBLE);
+                et_password.setText(friend.getLongitude());
+                et_password2.setText(friend.getLatitude());
+            }
+
             et_username.setEnabled(false);
             et_username.setFocusable(false);
-            et_password.setHint(R.string.hint_longitude);
-            et_password.setEnabled(false);
-            et_password.setFocusable(false);
-            et_password.setInputType(InputType.TYPE_CLASS_TEXT);
-            et_password2.setEnabled(false);
-            et_password2.setFocusable(false);
-            et_password2.setInputType(InputType.TYPE_CLASS_TEXT);
-            et_password2.setHint("Latitude");
-            et_name.setEnabled(false);
-            et_name.setFocusable(false);
-            et_lastname.setEnabled(false);
-            et_lastname.setFocusable(false);
-            et_phonenumber.setEnabled(false);
-            et_phonenumber.setFocusable(false);
-            registerButton.setVisibility(View.INVISIBLE);
-
             et_username.setText(friendUsername);
-            et_password.setText(friend.getLongitude());
-            et_password2.setText(friend.getLatitude());
             et_name.setText(friend.getName());
             et_lastname.setText(friend.getLastname());
             et_phonenumber.setText(friend.getPhoneNumber());
@@ -155,6 +179,7 @@ public class RegisterActivity extends AppCompatActivity {
                 }
             });
         }
+
 
     }
 
@@ -277,9 +302,38 @@ public class RegisterActivity extends AppCompatActivity {
             returnIntent.putExtras(mBundle);*/
            // setResult(Activity.RESULT_OK,returnIntent);
             //finish();
-            showProgress(true);
-            mAuthTask = new UserLoginTask(user);
-            mAuthTask.execute((Void) null);
+
+            if (isMainActivity)
+            {
+                dbAdapter.open();
+                myUser = dbAdapter.getEntry(username);
+                dbAdapter.close();
+
+                boolean equal = checkObjects(user, myUser);
+                if (!equal)
+                {
+                    myUser = user;
+                    showProgress(true);
+                    mAuthTask = new UserLoginTask(user, "true");
+                    mAuthTask.execute((Void) null);
+                }
+                else
+                {
+                    setResult(RESULT_CANCELED);
+                    finish();
+                }
+            }
+            else
+            {
+                myUser = user;
+                showProgress(true);
+                CheckUsernameExistTask checkUsernameExistTask = new CheckUsernameExistTask(user.getUsername());
+                checkUsernameExistTask.execute((Void) null);
+
+                /*showProgress(true);
+                mAuthTask = new UserLoginTask(user, "false");
+                mAuthTask.execute((Void) null);*/
+            }
         }
     }
 
@@ -328,9 +382,11 @@ public class RegisterActivity extends AppCompatActivity {
     public class UserLoginTask extends AsyncTask<Void, Void, String> {
 
         private final User user;
+        private final String mUpdate;
 
-        UserLoginTask(User mUser) {
+        UserLoginTask(User mUser, String update) {
             user = mUser;
+            mUpdate = update;
         }
 
         @Override
@@ -346,6 +402,7 @@ public class RegisterActivity extends AppCompatActivity {
             //postParameters.add(new BasicNameValuePair("image", stringImage ));
             postParameters.add(new BasicNameValuePair("image", user.getImage()));
             postParameters.add(new BasicNameValuePair("created", user.getCreated() ));
+            postParameters.add(new BasicNameValuePair("update", mUpdate ));
             String res = null;
             try {
                 // Simulate network access. //http://192.168.0.103:8081/process_newuser
@@ -372,15 +429,16 @@ public class RegisterActivity extends AppCompatActivity {
 
             if (result.equals("success"))
             {
-                // otvaranje glavne forme
+                if (!isMainActivity) {
+                    // otvaranje glavne forme
                 /*Intent i = new Intent(RegisterActivity.this, MainActivity.class);
                 startActivity(i);*/
-                // slanje samo username-a
-                Intent returnIntent = new Intent();
-                returnIntent.putExtra("result", et_username.getText().toString());
-                setResult(Activity.RESULT_OK,returnIntent);
-                finish();
-                // slanje objekta
+                    // slanje samo username-a
+                    Intent returnIntent = new Intent();
+                    returnIntent.putExtra("result", et_username.getText().toString());
+                    setResult(Activity.RESULT_OK, returnIntent);
+                    finish();
+                    // slanje objekta
                /* Intent returnIntent = new Intent();
                 returnIntent.putExtra("result", user);
                 Bundle mBundle = new Bundle();
@@ -388,14 +446,22 @@ public class RegisterActivity extends AppCompatActivity {
                 returnIntent.putExtras(mBundle);
                 setResult(Activity.RESULT_OK,returnIntent);
                 finish();*/
+                }
+                else{
+                    dbAdapter.open();
+                    dbAdapter.updateEntry(myUser);
+                    dbAdapter.close();
+                    setResult(6);
+                    finish();
+                }
             }
-            else if (result.equals("userErr"))
+            /*else if (result.equals("userExist"))
             {
                 et_username.setError(getString(R.string.error_username_already_taken));
                 et_username.requestFocus();
                 //mPasswordView.setError(getString(R.string.error_incorrect_password));
                 //mPasswordView.requestFocus();
-            }
+            }*/
             else
             {
                 Toast.makeText(RegisterActivity.this, "Error on sending data! Check internet connection.", Toast.LENGTH_SHORT).show();
@@ -409,6 +475,54 @@ public class RegisterActivity extends AppCompatActivity {
         protected void onCancelled() {
             mAuthTask = null;
             showProgress(false);
+        }
+    }
+
+    public class CheckUsernameExistTask extends AsyncTask<Void, Void, String> {
+
+        private final String mUsername;
+
+        CheckUsernameExistTask(String username) {
+            mUsername = username;
+        }
+
+        protected String doInBackground(Void... params) {
+            // TODO: attempt authentication against a network service.
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("username", mUsername ));
+            String resCheckUsername = null;
+            try {
+                resCheckUsername = CustomHttpClient.executeHttpPost(ipAddress + "/process_checkUsernameExist", postParameters);
+                resCheckUsername = resCheckUsername.trim();
+
+            } catch (InterruptedException e) {
+                return "Error";
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "Error";
+            }
+            return resCheckUsername;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+
+            if (result.equals("true"))
+            {
+                showProgress(false);
+                et_username.setError(getString(R.string.error_username_already_taken));
+                et_username.requestFocus();
+            }
+            else if (result.equals("false"))
+            {
+                mAuthTask = new UserLoginTask(myUser, "false");
+                mAuthTask.execute((Void) null);
+            }
+            else
+            {
+                Toast.makeText(getApplicationContext(), "Error on checking username!", Toast.LENGTH_SHORT).show();
+            }
+
         }
     }
 
@@ -459,5 +573,32 @@ public class RegisterActivity extends AppCompatActivity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    public boolean checkObjects(User user1, User user2)
+    {
+        boolean equal = true;
+
+        if (!user1.getUsername().equals(user2.getUsername()))
+            return  false;
+        if (!user1.getPassword().equals(user2.getPassword()))
+            return  false;
+        if (!user1.getName().equals(user2.getName()))
+            return  false;
+        if (!user1.getLastname().equals(user2.getLastname()))
+            return  false;
+        if (!user1.getPhoneNumber().equals(user2.getPhoneNumber()))
+            return  false;
+        /*if (!user1.getImage().equals(user2.getImage()))
+            return  false;*/
+        String s1 = user1.getImage();
+        String s2 = user2.getImage();
+        if (s1.equals(s2))
+            return false;
+
+        /*boolean test = true;
+        test  = s1.regionMatches(0, s2, 0, 15);*/
+
+        return equal;
     }
 }

@@ -3,44 +3,35 @@ package mosis.projekat;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
-import android.app.Activity;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ListView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
-
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Random;
 
 public class GameActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.0.103:8081";
+    //private String ipAddress = "http:/10.10.3.188:8081";
+    private String ipAddress = MainActivity.publicIpAddress;
 
     String questionPoints = "5";
     private RadioGroup radioGroup;
@@ -58,6 +49,7 @@ public class GameActivity extends AppCompatActivity {
     private View mProgressView;
     private SendPointsTask mAuthTask = null;
     private String myUsername = "";
+    private String teamName = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,6 +87,7 @@ public class GameActivity extends AppCompatActivity {
         String wrongAnswer3 = intent.getStringExtra("wrongAnswer3");
         questID = intent.getStringExtra("questID");
         myUsername = intent.getStringExtra("myUsername");
+        teamName = intent.getStringExtra("teamName");
 
         tv_question.setText(question);
 
@@ -149,9 +142,15 @@ public class GameActivity extends AppCompatActivity {
                 } else {
                     // FINISH ACTIVITY
                     if (correctAnswered) {
-                        showProgress(true);
-                        mAuthTask = new SendPointsTask(questionPoints, myUsername);
-                        mAuthTask.execute((Void) null);
+                        if (isHaveInternetConnection()) {
+                            showProgress(true);
+                            mAuthTask = new SendPointsTask(questionPoints, myUsername, teamName);
+                            mAuthTask.execute((Void) null);
+                        }
+                        else
+                        {
+                            Toast.makeText(getApplicationContext(), "You not have internet connection!", Toast.LENGTH_SHORT).show();
+                        }
                     } else {
                         Intent returnIntent = new Intent(GameActivity.this, MainActivity.class);
                         returnIntent.putExtra("status", "wrong");
@@ -260,10 +259,12 @@ public class GameActivity extends AppCompatActivity {
 
         private final String mPoints;
         private final String mUsername;
+        private final String mTeamName;
 
-        SendPointsTask(String numberOfPoints, String username) {
+        SendPointsTask(String numberOfPoints, String username, String TeamName) {
             mPoints = numberOfPoints;
             mUsername = username;
+            mTeamName = TeamName;
         }
 
         @Override
@@ -272,6 +273,7 @@ public class GameActivity extends AppCompatActivity {
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("points", mPoints ));
             postParameters.add(new BasicNameValuePair("username", mUsername ));
+            postParameters.add(new BasicNameValuePair("team_name", mTeamName ));
 
             String res = null;
             try {
@@ -319,12 +321,16 @@ public class GameActivity extends AppCompatActivity {
                 setResult(4,returnIntent);
                 finish();
             }
-            else
+            else if (result.equals("error"))
             {
                 Intent returnIntent = new Intent(GameActivity.this, MainActivity.class);
                 returnIntent.putExtra("status", "wrong");
                 setResult(4,returnIntent);
                 finish();
+            }
+            else
+            {
+                Toast.makeText(getApplicationContext(), "Check internet connection!", Toast.LENGTH_SHORT).show();
             }
         }
 
@@ -357,6 +363,20 @@ public class GameActivity extends AppCompatActivity {
                     }).show();
         }
 
+    public boolean isHaveInternetConnection() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        boolean NisConnected = activeNetwork != null && activeNetwork.isConnected();
+        if (NisConnected) {
+            if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE || activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
+                return true;
+            } else if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE)
+                return true;
+            else
+                return false;
+        }
+        return false;
+    }
 
 }
 

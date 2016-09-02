@@ -3,9 +3,6 @@ package mosis.projekat;
 import android.Manifest;
 import android.app.Activity;
 import android.app.Dialog;
-import android.app.Notification;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -19,6 +16,8 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.media.ThumbnailUtils;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -26,9 +25,9 @@ import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
-import android.support.v4.app.NotificationCompat;
 import android.support.v4.util.ArrayMap;
 import android.support.v7.app.AlertDialog;
+import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -56,7 +55,6 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
@@ -72,20 +70,25 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
-import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback,  com.google.android.gms.location.LocationListener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, GoogleMap.OnMarkerClickListener {
 
-    private String ipAddress = "http://192.168.0.103:8081";
+    public static String publicIpAddress = "http://192.168.1.73:8081"; // htc wildfire
+    //public static String publicIpAddress = "http://192.168.137.233:8081"; // softUP
+    //public static String publicIpAddress = "http://lookfortheanswer.herokuapp.com";
+    private String ipAddress = publicIpAddress;
+
+    //private String ipAddress = "http://10.10.3.188:8081";
     private  int categoryShowRadius = 250;
     private double categoryRadius = 250.0; // u metrima
     private double questionRadius = 50.0; // u metrima
     private double radiusSearchCategory = categoryRadius;
     private UpdateLocTask mAuthTask = null;
+    private CheckFriends checkFriendsTask = null;
+    private GetCategoryTask getCategoryTask = null;
     String response = null;
     SupportMapFragment sMapFragment;
     private LatLng myLoc;
@@ -94,6 +97,7 @@ public class MainActivity extends AppCompatActivity
     private GoogleMap mMap;
     private String myUsername;
     private String friendsUsernames = "";
+    private String teamName = "";
     //FragmentManager sFm;
     private static final String TAG = "MainActivity";
     private static final long INTERVAL = 1000 * 10;
@@ -108,15 +112,17 @@ public class MainActivity extends AppCompatActivity
     private ArrayList<Marker> friendsMarkers;
     private ArrayList<Marker> categoryMarkers;
     private ArrayList<Marker> questionMarkers;
-    private int numberOfQuestion = 5;
+    private int numberOfQuestion = -1; //5
     private int questionNumber = 0;
     Questions questions;
     private View mCustomMarkerView;
     private ImageView mMarkerImageView;
     //private String ImageUrl = "";
     //private Circle mCircle;
-    private int correctAnswered = 0;
+    private int correctAnswered = -1;
     private boolean serviceOn = false;
+    long previousTime;
+    View hView;
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -159,7 +165,7 @@ public class MainActivity extends AppCompatActivity
                 }
                 else if ((questionNumber - 1 )< numberOfQuestion)
                 {
-                        // Next question
+                    // Next question
                     questionLatLng = myLoc;
                     float meters[] = new float[1];
                     Location.distanceBetween(categoryLatLng.latitude, categoryLatLng.longitude, questionLatLng.latitude, questionLatLng.longitude, meters);
@@ -218,9 +224,19 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        final DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close){
+            @Override
+            public void onDrawerSlide(View drawerView, float slideOffset)
+            {
+                super.onDrawerSlide(drawerView, slideOffset);
+                drawer.bringChildToFront(drawerView);
+                drawer.requestLayout();
+                drawer.setScrimColor(Color.TRANSPARENT);
+
+            }
+        };
         drawer.setDrawerListener(toggle);
         toggle.syncState();
 
@@ -230,28 +246,16 @@ public class MainActivity extends AppCompatActivity
         // azuriranje username u header-u nav bara
         Intent intent = getIntent();
         String username = intent.getStringExtra("username");
-        View hView = navigationView.getHeaderView(0);
+        hView = navigationView.getHeaderView(0);
         TextView username_view = (TextView) hView.findViewById(R.id.username_text);
         username_view.setText(username);
         myUsername = username;
-        //friendsUsernames = "";
+        updateNavbarUserData();
 
-        CheckFriends mFriendsTask;
-        mFriendsTask = new CheckFriends(username);
-        mFriendsTask.execute((Void) null);
-
-        /*try {
-            if (googleMap == null) {
-                googleMap = ((MapFragment) getFragmentManager().
-                        findFragmentById(R.id.map)).getMap();
-            }
-            googleMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-            Marker TP = googleMap.addMarker(new MarkerOptions().
-                    position(TutorialsPoint).title("TutorialsPoint"));
+        if (checkFriendsTask == null) {
+            checkFriendsTask = new CheckFriends(myUsername);
+            checkFriendsTask.execute((Void) null);
         }
-        catch (Exception e) {
-            e.printStackTrace();
-        }*/
 
         //show error dialog if GoolglePlayServices not available
         if (!isGooglePlayServicesAvailable()) {
@@ -268,33 +272,42 @@ public class MainActivity extends AppCompatActivity
         sMapFragment.getMapAsync(this);
         FragmentManager sFm = getSupportFragmentManager();
         sFm.beginTransaction().add(R.id.map, sMapFragment).commit();
-        // if (sMapFragment.isAdded())
-        // {
-        // sFm.beginTransaction().hide(sMapFragment).commit();
+    }
 
-        // }
-       /* if (drawer.isDrawerOpen(GravityCompat.START))
-        {
-            sFm.beginTransaction().hide(sMapFragment).commit();
+    public void updateNavbarUserData()
+    {
+        try {
+            dbAdapter = new ProjekatDBAdapter(getApplicationContext());
+            dbAdapter.open();
+            User user = dbAdapter.getEntry(myUsername);
+            dbAdapter.close();
+
+            if (user != null)
+            {
+                Bitmap avatar = StringToBitMap(user.getImage());
+                ImageView userAvatar = (ImageView) hView.findViewById(R.id.user_avatar);
+                userAvatar.setImageBitmap(avatar);
+                TextView name_lastname_view = (TextView) hView.findViewById(R.id.name_lastname_text);
+                name_lastname_view.setText(user.getName() + " " + user.getLastname());
+                teamName = user.getTeamName();
+                TextView team_name_view = (TextView) hView.findViewById(R.id.team_name_text);
+                if (teamName != null && !TextUtils.isEmpty(teamName))
+                    team_name_view.setText("Team: " + teamName);
+                else
+                    team_name_view.setVisibility(View.GONE);
+            }
+            else
+            {
+                GetFriendProfile mFriendProfileTask;
+                mFriendProfileTask = new GetFriendProfile(myUsername, "true");
+                mFriendProfileTask.execute((Void) null);
+                //mFriendProfileTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+            }
         }
-        else
+        catch (Exception e)
         {
-            sFm.beginTransaction().show(sMapFragment).commit();
-        }*/
-
-
-        /*// azuriranje username u header-u nav bara
-        Intent intent = getIntent();
-        String username = intent.getStringExtra("username");
-        View hView = navigationView.getHeaderView(0);
-        TextView username_view = (TextView) hView.findViewById(R.id.username_text);
-        username_view.setText(username);
-        myUsername = username;
-        //friendsUsernames = "";
-
-        CheckFriends mFriendsTask;
-        mFriendsTask = new CheckFriends(username);
-        mFriendsTask.execute((Void) null);*/
+            Log.e("MainActivity: ", "Setting user data in navbar -> " + e.toString());
+        }
     }
 
     @Override
@@ -302,8 +315,18 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
-        } else {
-            super.onBackPressed();
+        } else if (numberOfQuestion != -1)
+        {
+            cancelPostingQuestion();
+        }
+        else {
+            // super.onBackPressed();
+            if (2000 + previousTime > (previousTime = System.currentTimeMillis()))
+            {
+                super.onBackPressed();
+            } else {
+                Toast.makeText(getBaseContext(), "Tap back button in order to exit", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -329,6 +352,7 @@ public class MainActivity extends AppCompatActivity
             MenuItem nav_gallery = menu.findItem(R.id.nav_service);
             nav_gallery.setTitle("Stop service");
             navigationView.setNavigationItemSelectedListener(this);
+            nav_gallery.setIcon(R.drawable.ic_stop_service_icon);
             // ako je servis ukljucen onda ga iskljuci
             turnServiceOnOff();
         }
@@ -351,6 +375,17 @@ public class MainActivity extends AppCompatActivity
         if (serviceOn)
         {
             turnServiceOnOff();
+        }
+    }
+
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+        if (!serviceOn)
+        {
+            mAuthTask = null;
+            mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, "", "", "true");
+            mAuthTask.execute((Void) null);
         }
     }
 
@@ -397,24 +432,53 @@ public class MainActivity extends AppCompatActivity
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_get_categories) {
 
-            String query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from CategoryQuestions where ";
+            if (numberOfQuestion != -1)
+            {
+                cancelPostingQuestion();
+            } else
+            if (isHaveInternetConnection()) {
+                getAllCategoryDeafalut();
+            }
 
-            double [] boundingBox = getBoundingBox(myLoc.latitude, myLoc.longitude, categoryShowRadius);
-
-            query += " AND LatitudeCategory > '" + Double.toString(boundingBox[0]) + "' ";
-            query += "AND LongitudeCategory > '" + Double.toString(boundingBox[1]) + "' ";
-            query += "AND LatitudeCategory < '" + Double.toString(boundingBox[2]) + "' ";
-            query += "AND LongitudeCategory < '" + Double.toString(boundingBox[3]) + "' ";
-
-            GetCategoryTask mCategoryTask;
-            mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, "");
-            //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
-            mCategoryTask.execute();
             return true;
         } else if (id == R.id.action_search_categories)
         {
-            Intent i = new Intent(MainActivity.this, SearchActivity.class);
-            startActivityForResult(i, 1);
+            if (numberOfQuestion != -1)
+            {
+                cancelPostingQuestion();
+            } else {
+                Intent i = new Intent(MainActivity.this, SearchActivity.class);
+                startActivityForResult(i, 1);
+            }
+        } else if (id == R.id.action_show_friends)
+        {
+            if (numberOfQuestion != -1)
+            {
+                cancelPostingQuestion();
+            } else
+            if (friendsMarkers != null)
+            {
+                friendsAvatar = null;
+                friendsMarkers.clear();
+                friendsMarkers = null;
+                mMap.clear();
+                addMarkersAfterClearMap();
+                Toast.makeText(getApplicationContext(), "Friends marker hided!", Toast.LENGTH_SHORT).show();
+            }
+            else
+            {
+                /*CheckFriends mFriendsTask;
+                mFriendsTask = new CheckFriends(myUsername);
+                mFriendsTask.execute((Void) null);*/
+
+                if (isHaveInternetConnection()) {
+                    // Zoom in the Google Map
+                    if (checkFriendsTask == null) {
+                        checkFriendsTask = new CheckFriends(myUsername);
+                        checkFriendsTask.execute((Void) null);
+                    }
+                }
+            }
         }
 
         return super.onOptionsItemSelected(item);
@@ -443,6 +507,7 @@ public class MainActivity extends AppCompatActivity
                 nav_gallery.setTitle("Start service");
                 navigationView.setNavigationItemSelectedListener(this);
                 serviceOn = false;
+                item.setIcon(R.drawable.ic_play_light);
             }
             else
             {
@@ -452,12 +517,17 @@ public class MainActivity extends AppCompatActivity
                 nav_gallery.setTitle("Stop service");
                 navigationView.setNavigationItemSelectedListener(this);
                 serviceOn = true;
+                item.setIcon(R.drawable.ic_stop_service_icon);
             }
         } else if (id == R.id.nav_show_rank_list) {
             Intent i = new Intent(MainActivity.this, ActivityList.class);
             startActivityForResult(i, 1);
 
         } else if (id == R.id.nav_edit_profile) {
+            Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
+            //i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra("myUsername",myUsername);
+            startActivityForResult(intent, 1);
 
         } else if (id == R.id.nav_delete_profile) {
             AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
@@ -480,11 +550,20 @@ public class MainActivity extends AppCompatActivity
                     }).show();
 
         } else if (id == R.id.nav_logout) {
+            serviceOn = false;
+            mAuthTask = null;
+            mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, "", "", "true");
+            mAuthTask.execute((Void) null);
+
             SharedPreferences settings = getApplicationContext().getSharedPreferences(LoginActivity.PREFS_NAME, Context.MODE_PRIVATE);
             settings.edit().clear().commit();
             Intent intent = new Intent(MainActivity.this, LoginActivity.class);
             startActivity(intent);
             finish();
+            //dbAdapter = new ProjekatDBAdapter(getApplicationContext());
+            dbAdapter.open();
+            dbAdapter.deleteAllData();
+            dbAdapter.close();
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
@@ -496,41 +575,15 @@ public class MainActivity extends AppCompatActivity
     {
         if (ServiceSendMyLoc.serviceRunning)
         {
-                /*Context context = getApplicationContext();
-                Intent serviceIntent = new Intent(ServiceSendMyLoc.class.getName());
-                context.stopService(serviceIntent);*/
-
             Intent serviceIntent = new Intent(getBaseContext(), ServiceSendMyLoc.class);
             stopService(serviceIntent);
-
-            /*Toast.makeText(MainActivity.this, "Service stopped!", Toast.LENGTH_LONG).show();
-
-            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
-            Menu menu = navigationView.getMenu();
-            MenuItem nav_gallery = menu.findItem(R.id.nav_service);
-            nav_gallery.setTitle("Start service");
-            navigationView.setNavigationItemSelectedListener(this);*/
         }
         else
         {
-                /*Context context = getApplicationContext();
-                Intent serviceIntent = new Intent(ServiceSendMyLoc.class.getName());
-                serviceIntent.putExtra("myUsername", myUsername);
-                serviceIntent.putExtra("friendsUsernames", friendsUsernames);
-                context.startService(serviceIntent);*/
-
             Intent serviceIntent = new Intent(getBaseContext(), ServiceSendMyLoc.class);
             serviceIntent.putExtra("myUsername", myUsername);
             serviceIntent.putExtra("friendsUsernames", friendsUsernames);
             startService(serviceIntent);
-
-            /*Toast.makeText(MainActivity.this, "Service started!", Toast.LENGTH_LONG).show();
-
-            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
-            Menu menu = navigationView.getMenu();
-            MenuItem nav_gallery = menu.findItem(R.id.nav_service);
-            nav_gallery.setTitle("Stop service");
-            navigationView.setNavigationItemSelectedListener(this);*/
         }
     }
 
@@ -653,10 +706,12 @@ public class MainActivity extends AppCompatActivity
             // Showing the current location in Google Map
             mMap.moveCamera(CameraUpdateFactory.newLatLng(myLoc));
 
-            // Zoom in the Google Map
-            if (mAuthTask == null) {
-                mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, lon, lat);
-                mAuthTask.execute((Void) null);
+            if (isHaveInternetConnection()) {
+                // Zoom in the Google Map
+                if (mAuthTask == null) {
+                    mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, lon, lat, "false");
+                    mAuthTask.execute((Void) null);
+                }
             }
 
         } else {
@@ -714,7 +769,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     public boolean onMarkerClick(final Marker marker) {
 
-        if (friendsMarkers.contains(marker))
+        if (friendsMarkers != null && friendsMarkers.contains(marker))
         {
             //Toast.makeText(MainActivity.this,marker.getTitle(),Toast.LENGTH_LONG).show();
             Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
@@ -724,7 +779,7 @@ public class MainActivity extends AppCompatActivity
             intent.putExtra("latitude", marker.getPosition().latitude);
             startActivityForResult(intent, 1);
         }
-        else if (categoryMarkers.contains(marker))
+        else if (categoryMarkers != null && categoryMarkers.contains(marker))
         {
             float meters[] = new float[1];
             Location.distanceBetween(marker.getPosition().latitude, marker.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
@@ -738,9 +793,14 @@ public class MainActivity extends AppCompatActivity
                             {
                                 // User zeli da odgovara na kliknutu kategoriju
                                 // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
+                                String allUsernames = myUsername + "," + friendsUsernames + ",";
+                                if (teamName != null && !TextUtils.isEmpty(teamName))
+                                {
+                                    allUsernames += teamName + ",";
+                                }
                                 String categoryID = marker.getTitle();
                                 GetQuestionsForCategoryTask mQuestionTask;
-                                mQuestionTask = new GetQuestionsForCategoryTask(categoryID);
+                                mQuestionTask = new GetQuestionsForCategoryTask(categoryID, allUsernames);
                                 //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
                                 mQuestionTask.execute();
                             }
@@ -759,7 +819,7 @@ public class MainActivity extends AppCompatActivity
                 Toast.makeText(MainActivity.this, "You are two far from category!", Toast.LENGTH_SHORT).show();
             }
         }
-        else if (questionMarkers.contains(marker))
+        else if (questionMarkers != null && questionMarkers.contains(marker))
         {
             final String numbOfQuest = Integer.toString(numberOfQuestion);
             float meters[] = new float[1];
@@ -788,6 +848,7 @@ public class MainActivity extends AppCompatActivity
                                 i.putExtra("wrongAnswer3", wrongAnswer123[2]);
                                 i.putExtra("questID", questID);
                                 i.putExtra("myUsername", myUsername);
+                                i.putExtra("teamName", teamName);
                                 i.putExtra("correctAnswered", Integer.toString(correctAnswered));
                                 startActivityForResult(i, 1);
                             }
@@ -809,16 +870,11 @@ public class MainActivity extends AppCompatActivity
         else
         {
             // SOMETHING WRONG WITH MARKER
+            Toast.makeText(MainActivity.this, "Something wrong with marker!", Toast.LENGTH_LONG).show();
         }
 
         return false;
     }
-
-    /*@Override
-    public boolean onMarkerClick(Marker marker) {
-        Toast.makeText(this,marker.getTitle(),Toast.LENGTH_LONG).show();
-        return true;
-    }*/
 
     ////////////////UPDATE LOKACIJE ///////////////
     public class UpdateLocTask extends AsyncTask<Void, Void, String> {
@@ -827,12 +883,14 @@ public class MainActivity extends AppCompatActivity
         private final String mFriends;
         private final String mLongitude;
         private final String mLatitude;
+        private final String mUserOffline;
 
-        UpdateLocTask(String username, String friends, String longitude, String latitude) {
+        UpdateLocTask(String username, String friends, String longitude, String latitude, String userOffline) {
             mUsername = username;
             mFriends = friends;
             mLongitude = longitude;
             mLatitude = latitude;
+            mUserOffline = userOffline;
         }
 
         @Override
@@ -843,20 +901,16 @@ public class MainActivity extends AppCompatActivity
             postParameters.add(new BasicNameValuePair("friends", mFriends ));
             postParameters.add(new BasicNameValuePair("longitude", mLongitude ));
             postParameters.add(new BasicNameValuePair("latitude", mLatitude ));
+            postParameters.add(new BasicNameValuePair("userOffline", mUserOffline ));
             String res = null;
             try {
-                // Simulate network access. // http://192.168.0.103:8081/process_updatelocation
-                // 192.168.1.73:8081
                 response = CustomHttpClient.executeHttpPost(ipAddress + "/process_updatelocation", postParameters);
                 res=response.toString();
                 res = res.trim();
-                //Thread.sleep(2000);
             } catch (InterruptedException e) {
-                //return false;
                 return "Error";
             } catch (Exception e) {
                 e.printStackTrace();
-                //return false;
                 return "Error";
             }
 
@@ -867,10 +921,10 @@ public class MainActivity extends AppCompatActivity
         protected void onPostExecute(String result) {
             mAuthTask = null;
 
-            if (!result.equals("noFriends"))
+            if (!result.equals("noFriends") && !result.equals("Error"))
             {
                 // Update-lokacije prijatelja
-                if (!friendsAvatar.isEmpty()) // Mozda pukne ako friendsAvatars nije inic.
+                if (friendsAvatar != null && !friendsAvatar.isEmpty()) // Mozda pukne ako friendsAvatars nije inic.
                 {
                     ArrayList<User> friendsLocation = new ArrayList<User>();
                     Gson gson = new Gson();
@@ -881,20 +935,28 @@ public class MainActivity extends AppCompatActivity
                         friendsLocation.add(user);
                     }
 
+                    // Nije testirano
+                    if (friendsMarkers != null && friendsLocation.size() < friendsMarkers.size())
+                    {
+                        friendsMarkers.clear();
+                        mMap.clear();
+                        addMarkersAfterClearMap();
+                    }
+
                     //String[] friendUsername = friendsUsernames.split(",");
                     for (int i=0; i<friendsLocation.size(); i++)
                     {
                         boolean markerPostoji = false;
-                        for (int j=0; j<friendsMarkers.size(); j++)
-                        {
-                            if (friendsMarkers.get(j).getTitle().equals(friendsLocation.get(i).getUsername()))
-                            {
-                                markerPostoji = true;
-                                Double lat = Double.parseDouble(friendsLocation.get(i).getLatitude());
-                                Double lon = Double.parseDouble(friendsLocation.get(i).getLongitude());
-                                LatLng friendPosition = new LatLng(lat, lon);
-                                friendsMarkers.get(j).setPosition(friendPosition);
-                                break;
+                        if (friendsMarkers != null) {
+                            for (int j = 0; j < friendsMarkers.size(); j++) {
+                                if (friendsMarkers.get(j).getTitle().equals(friendsLocation.get(i).getUsername())) {
+                                    markerPostoji = true;
+                                    Double lat = Double.parseDouble(friendsLocation.get(i).getLatitude());
+                                    Double lon = Double.parseDouble(friendsLocation.get(i).getLongitude());
+                                    LatLng friendPosition = new LatLng(lat, lon);
+                                    friendsMarkers.get(j).setPosition(friendPosition);
+                                    break;
+                                }
                             }
                         }
 
@@ -914,40 +976,26 @@ public class MainActivity extends AppCompatActivity
                                         .icon(BitmapDescriptorFactory.fromBitmap(getMarkerBitmapFromView(mCustomMarkerView, thumbnail))));
                                 friendsMarkers.add(friendMarker);
                                 mMap.setOnMarkerClickListener(MainActivity.this);
-                                /*mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-                                    @Override
-                                    public boolean onMarkerClick(Marker markerFriend) {
-                                        //Toast.makeText(MainActivity.this,marker.getTitle(),Toast.LENGTH_LONG).show();
-                                        Intent intent = new Intent(MainActivity.this, RegisterActivity.class);
-                                        //i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                                        intent.putExtra("friendUsername", markerFriend.getTitle());
-                                        intent.putExtra("longitude",markerFriend.getPosition().longitude);
-                                        intent.putExtra("latitude", markerFriend.getPosition().latitude);
-                                        startActivity(intent);
-                                        return false;
-                                    }
-                                }); // PUCA !!!!!!!!!!*/
-                               // friendsMarkers.add(friendMarker);
-
-
-                            /*mMap.setOnMapClickListener(new GoogleMap.OnMarkerClickListener()
-                            {
-                                @Override
-                                public boolean onMarkerClick(Marker marker) {
-                                   dbAdapter.open();
-                                    if (marker.getTitle().equals("sad"))
-                                    dbAdapter.close();
-
-
-                                }
-                            });*/
                             }
                         }
 
                     }
                 }
             }
+            else
+            {
+                if (result.equals("Error"))
+                {
+                    Toast.makeText(MainActivity.this, "Error on update location and communication with server! Check internet connection! ", Toast.LENGTH_LONG).show();
 
+                }
+                else if (friendsMarkers != null && friendsMarkers.size() > 0)
+                {
+                    friendsMarkers.clear();
+                    mMap.clear();
+                    addMarkersAfterClearMap();
+                }
+            }
         }
 
         @Override
@@ -959,15 +1007,21 @@ public class MainActivity extends AppCompatActivity
     public class GetQuestionsForCategoryTask extends AsyncTask<Void, Void, String> {
 
         private final String mCategoryID;
+        private final String mAllUsernames;
+        //private final String mTeamName;
 
-        GetQuestionsForCategoryTask(String categoryID) {
+        GetQuestionsForCategoryTask(String categoryID, String allUsernames) {
             mCategoryID = categoryID;
+            mAllUsernames = allUsernames;
+            //mTeamName = TeamName;
         }
 
         protected String doInBackground(Void... params) {
             // TODO: attempt authentication against a network service.
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("categoryID", mCategoryID ));
+            postParameters.add(new BasicNameValuePair("allUsernames", mAllUsernames ));
+           //postParameters.add(new BasicNameValuePair("team_name", mTeamName ));
             String resQuestions = null;
             try {
                 // Simulate network access. // http://192.168.0.103:8081/process_checkuser
@@ -982,7 +1036,6 @@ public class MainActivity extends AppCompatActivity
                 return "Error";
             }
 
-            //return response;
             return resQuestions;
         }
 
@@ -1035,70 +1088,20 @@ public class MainActivity extends AppCompatActivity
                     Double lon = Double.parseDouble(longLat[0]);
                     LatLng questionLatLng = new LatLng(lat, lon);
                     final String questNumber = Integer.toString(i+1);
-                    //final String numbOfQuest = Integer.toString(questLongLat.length);
-
-
                     Marker marker = mMap.addMarker(new MarkerOptions()
                             .position(questionLatLng)
                             .title(questNumber)
                             .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
                     questionMarkers.add(marker);
                     mMap.setOnMarkerClickListener(MainActivity.this);
-                       /* mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-                            @Override
-                            public boolean onMarkerClick(final Marker marker) {
-
-                                float meters[] = new float[1];
-                                Location.distanceBetween(marker.getPosition().latitude, marker.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
-                                if (meters[0] < questionRadius)
-                                {
-                                    AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
-                                            .setMessage("Question: " + marker.getTitle() + "/" + numbOfQuest + "\n\nDo you want to answer ?" )
-                                            .setCancelable(false)
-                                            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                                                public void onClick(DialogInterface dialog, int which)
-                                                {
-                                                    // User zeli da odgovara na kliknutu kategoriju
-                                                    // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
-                                                    String questID = marker.getTitle();
-                                                    dbAdapter.open();
-                                                    Questions questDB = dbAdapter.getQuestion(questID);
-                                                    dbAdapter.close();
-                                                    marker.remove(); // uklanjanje markera
-                                                    String [] wrongAnswer123 = questDB.getWrongAnswers().split("\\|\\|");
-                                                    Intent i = new Intent(MainActivity.this, GameActivity.class);
-                                                    i.putExtra("question", questDB.getQuestions());
-                                                    i.putExtra("correctAnswer", questDB.getCorrectAnswers());
-                                                    i.putExtra("wrongAnswer1", wrongAnswer123[0]);
-                                                    i.putExtra("wrongAnswer2", wrongAnswer123[1]);
-                                                    i.putExtra("wrongAnswer3", wrongAnswer123[2]);
-                                                    i.putExtra("questID", questID);
-                                                    i.putExtra("myUsername", myUsername);
-                                                    i.putExtra("correctAnswered", Integer.toString(correctAnswered));
-                                                    startActivityForResult(i, 1);
-
-
-                                                    //dialog.cancel();
-                                                }
-                                            })
-                                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
-                                                public void onClick(DialogInterface dialog, int which)
-                                                {
-                                                    // Perform Your Task Here--When No is pressed
-                                                    dialog.cancel();
-                                                }
-                                            }).show();
-                                }
-                                else
-                                {
-                                    // Toast to far from category
-                                    Toast.makeText(MainActivity.this, "You are two far from question!", Toast.LENGTH_LONG).show();
-                                }
-                                return false;
-                            }
-                        });*/
                 }
 
+            }
+            else
+            {
+                Toast.makeText(getApplicationContext(), "Error with getting data on selected category! Try again", Toast.LENGTH_LONG).show();
+                /*mMap.clear();
+                addMarkersAfterClearMap();*/
             }
 
         }
@@ -1119,18 +1122,11 @@ public class MainActivity extends AppCompatActivity
             postParameters.add(new BasicNameValuePair("username", mUsername ));
             String resCheckFriends = null;
             try {
-                // Simulate network access. // http://192.168.0.103:8081/process_getfriendship
-                // 192.168.137.79:8081
                 resCheckFriends = CustomHttpClient.executeHttpPost(ipAddress + "/process_getfriendship", postParameters);
-                /*res=response.toString();
-                res = res.trim();*/
-                //Thread.sleep(2000);
             } catch (InterruptedException e) {
-                //return false;
                 return "Error";
             } catch (Exception e) {
                 e.printStackTrace();
-                //return false;
                 return "Error";
             }
 
@@ -1139,7 +1135,8 @@ public class MainActivity extends AppCompatActivity
 
         @Override
         protected void onPostExecute(String result) {
-           // mAuthTask = null;
+            // mAuthTask = null;
+            checkFriendsTask = null;
 
             result = result.trim();
             if (!result.equals("noFriends"))
@@ -1152,10 +1149,6 @@ public class MainActivity extends AppCompatActivity
                     dbAdapter = new ProjekatDBAdapter(getApplicationContext());
                     dbAdapter.open();
                     usersBaza = dbAdapter.getAllEntriesUsernameCreated();
-               /* if (usersBaza == null || usersBaza.isEmpty()) // PROVERITI OVO
-                {
-                    new ArrayList<User>();
-                }*/
                     dbAdapter.close();
 
                     // Podaci o prijateljima sa servera
@@ -1169,12 +1162,6 @@ public class MainActivity extends AppCompatActivity
                     }
 
                     for (int i = 0; i < usersServer.size(); i++) {
-                        // NE MOZE OVAKO //
-                       /* if (usersBaza.contains(usersServer.get(i))) {
-                            usersBaza.remove(usersServer.get(i));
-                            usersServer.remove(i);
-                            i--;
-                        }*/
                         for (int j=0; j < usersBaza.size(); j++)
                         {
                             if ((usersServer.get(i).getUsername().equals(usersBaza.get(j).getUsername())) && (usersServer.get(i).getCreated().equals(usersBaza.get(j).getCreated())))
@@ -1196,6 +1183,7 @@ public class MainActivity extends AppCompatActivity
                     }
 
                     friendsAvatar = new ArrayMap<String, Bitmap>();
+                    friendsUsernames = "";
                     dbAdapter.open();
                     usersBaza = dbAdapter.getAllEntries();
                     dbAdapter.close();
@@ -1214,58 +1202,23 @@ public class MainActivity extends AppCompatActivity
                         friendsUsernames = friendsUsernames.substring(0, friendsUsernames.lastIndexOf(","));
 
                     for (int i = 0; i < usersServer.size(); i++) {
-                        GetFriendProfile mFriendProfileTask;
-                        mFriendProfileTask = new GetFriendProfile(usersServer.get(i).getUsername());
-                        mFriendProfileTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
-                       /* try {
-                            mFriendProfileTask.execute((Void) null).get();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
+                        if (!usersServer.get(i).getUsername().contains(myUsername)) { // mozda ovo i ne treba
+                            GetFriendProfile mFriendProfileTask;
+                            mFriendProfileTask = new GetFriendProfile(usersServer.get(i).getUsername(), "false");
+                            mFriendProfileTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
                         }
-                        // PROVERITI OVO
-                        /*try {
-                            mFriendProfileTask.get(30000, TimeUnit.MILLISECONDS);
-                            //Thread.sleep(10);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
-                        } catch (TimeoutException e) {
-                            e.printStackTrace();
-                        }*/
-                        //Thread.sleep(3000);
                     }
 
-                    /*friendsAvatar = new ArrayMap<String, Bitmap>();
-                    //dbAdapter = new ProjekatDBAdapter(getApplicationContext());
-                    dbAdapter.open();
-                    usersBaza = dbAdapter.getAllEntries();
-                    dbAdapter.close();
-                    for (int i = 0; i < usersBaza.size(); i++)
-                    {
-
-                        if (!usersBaza.get(i).getUsername().equals(myUsername))
-                        {
-                            friendsUsernames += usersBaza.get(i).getUsername() + ",";
-                            Bitmap avatar = StringToBitMap(usersBaza.get(i).getImage());
-                            friendsAvatar.put(usersBaza.get(i).getUsername(), avatar);
-                        }
-
-                    }
-                    if (friendsUsernames.length() > 0)
-                        friendsUsernames = friendsUsernames.substring(0, friendsUsernames.lastIndexOf(","));*/
-
+                    Toast.makeText(getApplicationContext(), "Check friends finished!", Toast.LENGTH_SHORT).show();
                 }
                 else
                 {
-                    Toast.makeText(MainActivity.this, "Error with getting data abaout friends!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Error with getting data about friends!", Toast.LENGTH_LONG).show();
                 }
             }
             else
             {
-                Toast.makeText(MainActivity.this, "You have no friends", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "You have no friends", Toast.LENGTH_LONG).show();
             }
 
         }
@@ -1279,23 +1232,21 @@ public class MainActivity extends AppCompatActivity
     public class GetFriendProfile extends AsyncTask<Void, Void, String> {
 
         private final String mUsername;
+        private final String mMyProfile;
 
-        GetFriendProfile(String username) {
+        GetFriendProfile(String username, String myProfile) {
             mUsername = username;
+            mMyProfile = myProfile;
         }
 
         protected String doInBackground(Void... params) {
             // TODO: attempt authentication against a network service.
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("username", mUsername ));
+            postParameters.add(new BasicNameValuePair("myProfile", mMyProfile ));
             String resFriendProfile = null;
             try {
-                // Simulate network access. // http://192.168.0.103:8081/process_checkuser
-                // 192.168.137.79:8081
                 resFriendProfile = CustomHttpClient.executeHttpPost(ipAddress + "/process_getFriendProfile", postParameters);
-                /*res=response.toString();
-                res = res.trim();*/
-                //Thread.sleep(100);
             } catch (InterruptedException e) {
                 return "Error";
             } catch (Exception e) {
@@ -1303,38 +1254,54 @@ public class MainActivity extends AppCompatActivity
                 return "Error";
             }
 
-            //return response;
             return resFriendProfile;
         }
 
         @Override
         protected void onPostExecute(String result) {
 
-            Gson gson = new Gson();
-            JsonArray jsonArray = new JsonParser().parse(result).getAsJsonArray();
-            User user = new User();
-            for (int i = 0; i < jsonArray.size(); i++) {
-                JsonElement str = jsonArray.get(i);
-                user = gson.fromJson(str, User.class);
-            }
-            try {
-                dbAdapter.open();
-                dbAdapter.insertEntry(user);
-                dbAdapter.close();
+            if (result.contains("Username")) {
+                Gson gson = new Gson();
+                JsonArray jsonArray = new JsonParser().parse(result).getAsJsonArray();
+                User user = new User();
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    JsonElement str = jsonArray.get(i);
+                    user = gson.fromJson(str, User.class);
+                }
+                try {
+                    dbAdapter.open();
+                    dbAdapter.insertEntry(user);
+                    dbAdapter.close();
 
-                if (!user.getUsername().equals(myUsername)) {
-                    if (friendsUsernames.length() > 0)
-                        friendsUsernames += "," + user.getUsername();
-                    else
-                        friendsUsernames = user.getUsername();
-                    Bitmap avatar = StringToBitMap(user.getImage());
-                    friendsAvatar.put(user.getUsername(), avatar);
+                    if (!user.getUsername().equals(myUsername)) {
+                        if (friendsUsernames.length() > 0)
+                            friendsUsernames += "," + user.getUsername();
+                        else
+                            friendsUsernames = user.getUsername();
+                        Bitmap avatar = StringToBitMap(user.getImage());
+                        friendsAvatar.put(user.getUsername(), avatar);
+                        Toast.makeText(getApplicationContext(), "Friend " + user.getUsername() + " added!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Bitmap avatar = StringToBitMap(user.getImage());
+                        ImageView userAvatar = (ImageView) hView.findViewById(R.id.user_avatar);
+                        userAvatar.setImageBitmap(avatar);
+                        TextView name_lastname_view = (TextView) hView.findViewById(R.id.name_lastname_text);
+                        name_lastname_view.setText(user.getName() + " " + user.getLastname());
+                        teamName = user.getTeamName();
+                        TextView team_name_view = (TextView) hView.findViewById(R.id.team_name_text);
+                        if (teamName != null && !TextUtils.isEmpty(teamName))
+                            team_name_view.setText("Team: " + teamName);
+                        else
+                            team_name_view.setVisibility(View.GONE);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Log.e(e.getClass().getName(), e.getMessage(), e.getCause());
                 }
             }
-            catch (Exception e)
+            else
             {
-                e.printStackTrace();
-                Log.e(e.getClass().getName(), e.getMessage(), e.getCause());
+                Toast.makeText(getApplicationContext(), "Error with getting profile!", Toast.LENGTH_SHORT).show();
             }
 
         }
@@ -1352,7 +1319,7 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-   private Bitmap getMarkerBitmapFromView(View view, Bitmap bitmap) {
+    private Bitmap getMarkerBitmapFromView(View view, Bitmap bitmap) {
 
         mMarkerImageView.setImageBitmap(bitmap);
         view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
@@ -1435,35 +1402,24 @@ public class MainActivity extends AppCompatActivity
                 Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
 
                 Marker questMarker = mMap.addMarker(new MarkerOptions()
-                            .position(questionLatLng)
-                            .title(Integer.toString(questionNumber-1))
-                            .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
-                    mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-                        @Override
-                        public boolean onMarkerClick(Marker marker) {
-                            Intent i = new Intent(MainActivity.this, QuestionActivity.class);
-                            i.putExtra("question", questions.getQuestions());
-                            i.putExtra("correctAnswer", questions.getCorrectAnswers());
-                            i.putExtra("wrongAnswer", questions.getWrongAnswers());
-                            i.putExtra("questionClicked", marker.getTitle());
-                            i.putExtra("questionNumber", Integer.toString(questionNumber));
-                            i.putExtra("numberOfQuestion", Integer.toString(numberOfQuestion));
-                            i.putExtra("spinnerCategory", questions.getCategory());
-                            startActivityForResult(i, 1);
-                            return false;
-                        }
-                    });
-
-                /*BitmapDescriptor icon = BitmapDescriptorFactory.fromResource(R.drawable.ic_question_marker);
-                mMap.addMarker(new MarkerOptions().position(questionLatLng).title(Integer.toString(questionNumber-1)).icon(icon)).showInfoWindow();*/
-
-                // primanje objekta User
-               /* Bundle bundle = data.getExtras();
-                if (bundle != null) {
-                    User user = (User) bundle.getSerializable("result");
-                   // User user = (User) getIntent().getSerializableExtra("result");
-                    //Integer beta = 0;
-                }*/
+                        .position(questionLatLng)
+                        .title(Integer.toString(questionNumber-1))
+                        .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+                    @Override
+                    public boolean onMarkerClick(Marker marker) {
+                        Intent i = new Intent(MainActivity.this, QuestionActivity.class);
+                        i.putExtra("question", questions.getQuestions());
+                        i.putExtra("correctAnswer", questions.getCorrectAnswers());
+                        i.putExtra("wrongAnswer", questions.getWrongAnswers());
+                        i.putExtra("questionClicked", marker.getTitle());
+                        i.putExtra("questionNumber", Integer.toString(questionNumber));
+                        i.putExtra("numberOfQuestion", Integer.toString(numberOfQuestion));
+                        i.putExtra("spinnerCategory", questions.getCategory());
+                        startActivityForResult(i, 1);
+                        return false;
+                    }
+                });
             }
             else if (resultCode == 3) {
                 String status = data.getStringExtra("status");
@@ -1477,7 +1433,7 @@ public class MainActivity extends AppCompatActivity
                     /*if (friendsMarkers != null)
                         friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE*/
                     questionNumber = 0;
-                    numberOfQuestion = 5;
+                    numberOfQuestion = -1; //5
                     FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
                     fab.setImageResource(android.R.drawable.ic_input_add);
                     //mCircle = null;
@@ -1504,20 +1460,46 @@ public class MainActivity extends AppCompatActivity
 
                 if (questionNumber == numberOfQuestion)
                 {
-                    //Toast.makeText(MainActivity.this, "Vrati markere za Kategorije!", Toast.LENGTH_LONG).show();
+                    numberOfQuestion = -1;
+                    questionNumber = 0;
+                    correctAnswered = -1;
                     mMap.clear();
                     if (questionMarkers != null)
                         questionMarkers.clear();
                     addMarkersAfterClearMap();
-                    GetCategoryTask mCategoryTask;
+
+                    /*GetCategoryTask mCategoryTask;
                     mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, "");
                     //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
-                    mCategoryTask.execute();
+                    mCategoryTask.execute();*/
+
+                    if (isHaveInternetConnection()) {
+                        getAllCategoryDeafalut();
+                    }
                 }
+            }
+
+            else if (resultCode == 6) // edit user
+            {
+                updateNavbarUserData();
+                Toast.makeText(getApplicationContext(), "Profile is edited...", Toast.LENGTH_SHORT).show();
             }
 
             else if (resultCode == Activity.RESULT_CANCELED)
             {
+                try {
+                    if (teamName == null || TextUtils.isEmpty(teamName))
+                    {
+                        dbAdapter.open();
+                        User user = dbAdapter.getTeamName(myUsername);
+                        dbAdapter.close();
+                        teamName = user.getTeamName();
+                    }
+                }
+                catch (Exception ec)
+                {
+                    Log.d("RESULT_CANCELED", ec.getMessage().toString());
+                }
 
             }
             else if (resultCode == 5) // SEARCH ACTIVITY
@@ -1555,18 +1537,30 @@ public class MainActivity extends AppCompatActivity
                 query += "AND LatitudeCategory < '" + Double.toString(boundingBox[2]) + "' ";
                 query += "AND LongitudeCategory < '" + Double.toString(boundingBox[3]) + "' ";
 
-                GetCategoryTask mCategoryTask;
-                mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, query);
-                //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
-                mCategoryTask.execute();
+                if (isHaveInternetConnection()) {
+                    // Zoom in the Google Map
+                    if (getCategoryTask == null) {
+                        String usernamesAndTeamName = "";
+                        if (teamName != null && !TextUtils.isEmpty(teamName))
+                        {
+                            usernamesAndTeamName = friendsUsernames + "," + teamName;
+                        }
+                        else
+                        {
+                            usernamesAndTeamName = friendsUsernames;
+                        }
+                        getCategoryTask =  new GetCategoryTask(myUsername, usernamesAndTeamName, query);
+                        getCategoryTask.execute((Void) null);
+                        /*getCategoryTask =  new GetCategoryTask(myUsername, friendsUsernames, query);
+                        getCategoryTask.execute();*/
+                    }
+                }
             }
         }
     }
 
     public class GetCategoryTask extends AsyncTask<Void, Void, String> {
 
-        //private final String myLong;
-        //private final String myLat;
         private final String myUsername;
         private final String myFriendsUsernames;
         private final String readyQuery;
@@ -1575,8 +1569,6 @@ public class MainActivity extends AppCompatActivity
             myUsername = username;
             myFriendsUsernames = friendUsernames;
             readyQuery = query;
-           /* myLong = longitude;
-            myLat = latitude;*/
         }
 
         protected String doInBackground(Void... params) {
@@ -1585,12 +1577,8 @@ public class MainActivity extends AppCompatActivity
             postParameters.add(new BasicNameValuePair("myUsername", myUsername ));
             postParameters.add(new BasicNameValuePair("friendsUsernames", myFriendsUsernames ));
             postParameters.add(new BasicNameValuePair("readyQuery", readyQuery ));
-            /*postParameters.add(new BasicNameValuePair("myLong", myLong ));
-            postParameters.add(new BasicNameValuePair("myLat", myLat ));*/
             String resCategory = null;
             try {
-                // Simulate network access. // http://192.168.0.103:8081/process_checkuser
-                // 192.168.137.79:8081
                 resCategory = CustomHttpClient.executeHttpPost(ipAddress + "/process_getCategory", postParameters);
                 resCategory=resCategory.toString();
                 resCategory = resCategory.trim();
@@ -1601,13 +1589,12 @@ public class MainActivity extends AppCompatActivity
                 e.printStackTrace();
                 return "Error";
             }
-
-            //return response;
             return resCategory;
         }
 
         @Override
         protected void onPostExecute(String result) {
+            getCategoryTask = null;
 
             if (result.contains("Category"))
             {
@@ -1624,8 +1611,8 @@ public class MainActivity extends AppCompatActivity
                 JsonArray jsonArray = new JsonParser().parse(result).getAsJsonArray();
                 Questions questionsCategory = new Questions();
 
-                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
-                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+                /*Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);*/
 
                 for (int i = 0; i < jsonArray.size(); i++) {
                     JsonElement str = jsonArray.get(i);
@@ -1641,6 +1628,7 @@ public class MainActivity extends AppCompatActivity
 
                         final String category = questionsCategory.getCategory();
                         final String userCreated = questionsCategory.getCreatedUser();
+                        Bitmap resizedIcon = getCategoryMarker(category);
                         Marker markerCategory = mMap.addMarker(new MarkerOptions()
                                 .position(categoryLatLng)
                                 .title(questionsCategory.getID())
@@ -1649,48 +1637,16 @@ public class MainActivity extends AppCompatActivity
                         categoryMarkers.add(markerCategory);
 
                         mMap.setOnMarkerClickListener(MainActivity.this);
-                    /*mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-                        @Override
-                        public boolean onMarkerClick(final Marker mQuest) {
-
-                            float meters[] = new float[1];
-                            Location.distanceBetween(mQuest.getPosition().latitude, mQuest.getPosition().longitude, myLoc.latitude, myLoc.longitude, meters);
-                            if (meters[0] < categoryRadius)
-                            {
-                                AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
-                                        .setMessage("Category: " + category + "\n" + "Created by " + userCreated + "\n\nDo you want to play game ?" )
-                                        .setCancelable(false)
-                                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                                            public void onClick(DialogInterface dialog, int which)
-                                            {
-                                                // User zeli da odgovara na kliknutu kategoriju
-                                                // Sakriti ostale markere (osim prijatelja) i prikazati samo pitanja
-                                                String categoryID = mQuest.getTitle();
-                                                GetQuestionsForCategory mQuestionTask;
-                                                mQuestionTask = new GetQuestionsForCategory(categoryID);
-                                                //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
-                                                mQuestionTask.execute();
-                                                //dialog.cancel();
-                                            }
-                                        })
-                                        .setNegativeButton("No", new DialogInterface.OnClickListener() {
-                                            public void onClick(DialogInterface dialog, int which)
-                                            {
-                                                // Perform Your Task Here--When No is pressed
-                                                dialog.cancel();
-                                            }
-                                        }).show();
-                            }
-                            else
-                            {
-                                // Toast to far from category
-                                Toast.makeText(MainActivity.this, "You are two far from category!", Toast.LENGTH_SHORT).show();
-                            }
-                            return false;
-                        }
-                    });*/
                     }
                 }
+            }
+            else if (result.contains("[]"))
+            {
+                Toast.makeText(getApplicationContext(), "No categories in this area!", Toast.LENGTH_SHORT).show();
+            }
+            else
+            {
+                Toast.makeText(getApplicationContext(), "Error with getting categories! Try again...", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -1747,8 +1703,10 @@ public class MainActivity extends AppCompatActivity
             {
                 Marker marker = categoryMarkers.get(i);
 
-                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
-                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);
+                /*Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+                Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);*/
+
+                Bitmap resizedIcon = getCategoryMarker(marker.getSnippet());
 
                 Marker markerCategory = mMap.addMarker(new MarkerOptions()
                         .position(marker.getPosition())
@@ -1787,7 +1745,7 @@ public class MainActivity extends AppCompatActivity
         }*/
     }
 
-    public class DeleteProfileTask extends AsyncTask<Void, Void, String> {
+   public class DeleteProfileTask extends AsyncTask<Void, Void, String> {
 
         private final String mUsername;
 
@@ -1810,8 +1768,6 @@ public class MainActivity extends AppCompatActivity
                 e.printStackTrace();
                 return "Error";
             }
-
-            //return response;
             return resDeletedProfile;
         }
 
@@ -1820,10 +1776,22 @@ public class MainActivity extends AppCompatActivity
 
             if (result.equals("success"))
             {
+                serviceOn = false;
+                mAuthTask = null;
+                mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, "", "", "true");
+                mAuthTask.execute((Void) null);
+
+                SharedPreferences settings = getApplicationContext().getSharedPreferences(LoginActivity.PREFS_NAME, Context.MODE_PRIVATE);
+                settings.edit().clear().commit();
+
                 Toast.makeText(getApplicationContext(), "Account deleted!", Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(MainActivity.this, LoginActivity.class);
                 startActivity(intent);
                 finish();
+                //dbAdapter = new ProjekatDBAdapter(getApplicationContext());
+                dbAdapter.open();
+                dbAdapter.deleteAllData();
+                dbAdapter.close();
             }
             else
             {
@@ -1832,4 +1800,137 @@ public class MainActivity extends AppCompatActivity
 
         }
     }
+
+    public boolean isHaveInternetConnection() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        boolean NisConnected = activeNetwork != null && activeNetwork.isConnected();
+        if (NisConnected) {
+            if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE || activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
+                return true;
+            } else if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE)
+                return true;
+            else
+                return false;
+        }
+        return false;
+    }
+
+    public void cancelPostingQuestion()
+    {
+        String message = "";
+        if (correctAnswered > -1)
+        {
+            message = "Cancel answering questions ?";
+        }
+        else
+        {
+            message = "Cancel posting questions ?";
+        }
+
+        AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which)
+                    {
+                        // Perform Your Task Here--When Yes Is Pressed.
+                        // obrisi markere sa pitanjima
+                        if (questionMarkers != null)
+                            questionMarkers.clear();
+                        mMap.clear(); // TREBA OPET POSTAVITI SVE MARKERE
+                        addMarkersAfterClearMap();
+                    /*if (friendsMarkers != null)
+                        friendsMarkers.clear(); // TREBA PROVERITI OVO PUCA OVDE*/
+                        questionNumber = 0;
+                        numberOfQuestion = -1; //5
+                        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+                        fab.setImageResource(android.R.drawable.ic_input_add);
+                        //mCircle = null;
+
+                        if (correctAnswered > -1)
+                        {
+                            if (isHaveInternetConnection()) {
+                                getAllCategoryDeafalut();
+                            }
+                            correctAnswered = -1;
+                        }
+
+
+                    }
+                })
+                .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which)
+                    {
+                        dialog.cancel();
+                    }
+                }).show();
+    }
+
+    public Bitmap getCategoryMarker(String category)
+    {
+
+        Bitmap marker = null;
+
+        if (category.contains("Culture"))
+        {
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+            marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
+        }
+        else if (category.contains("Cuisine"))
+        {
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.cuisine);
+            marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
+        }
+        else if (category.contains("Geography"))
+        {
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+            marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
+        }
+        else if (category.contains("History"))
+        {
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+            marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
+        }
+        else if (category.contains("Sport"))
+        {
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_category_sport);
+            marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
+        }
+
+        return  marker;
+    }
+
+    private void getAllCategoryDeafalut()
+    {
+        if (getCategoryTask == null) {
+
+            String query = "SELECT ID,Category,LongitudeCategory,LatitudeCategory,CreatedUser from CategoryQuestions where ";
+
+            double [] boundingBox = getBoundingBox(myLoc.latitude, myLoc.longitude, categoryShowRadius);
+
+            query += " LatitudeCategory > '" + Double.toString(boundingBox[0]) + "' ";
+            query += "AND LongitudeCategory > '" + Double.toString(boundingBox[1]) + "' ";
+            query += "AND LatitudeCategory < '" + Double.toString(boundingBox[2]) + "' ";
+            query += "AND LongitudeCategory < '" + Double.toString(boundingBox[3]) + "' ";
+
+            /*GetCategoryTask mCategoryTask;
+            mCategoryTask = new GetCategoryTask(myUsername, friendsUsernames, "");
+            //mCategoryTask.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
+            mCategoryTask.execute();*/
+
+            String usernamesAndTeamName = "";
+            if (teamName != null && !TextUtils.isEmpty(teamName))
+            {
+                usernamesAndTeamName = friendsUsernames +  "," + teamName;
+            }
+            else
+            {
+                usernamesAndTeamName = friendsUsernames;
+            }
+            getCategoryTask =  new GetCategoryTask(myUsername, usernamesAndTeamName, query);
+            getCategoryTask.execute((Void) null);
+        }
+    }
+
 }

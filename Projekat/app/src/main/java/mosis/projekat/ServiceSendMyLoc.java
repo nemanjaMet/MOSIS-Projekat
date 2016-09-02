@@ -8,9 +8,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.location.Location;
-import android.media.ThumbnailUtils;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -19,7 +19,6 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -29,11 +28,7 @@ import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -51,7 +46,8 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
         GoogleApiClient.OnConnectionFailedListener {
 
     public static Boolean serviceRunning = false;
-    private String ipAddress = "http://192.168.0.103:8081";
+    //private String ipAddress = "http:/10.10.3.188:8081";
+    private String ipAddress = MainActivity.publicIpAddress;
     LocationRequest mLocationRequest;
     GoogleApiClient mGoogleApiClient;
     Location mCurrentLocation;
@@ -64,7 +60,8 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
     private static final long FASTEST_INTERVAL = 1000 * 20;
     private int radiusNearLocation = 100; // meters
     private LatLng myLastLocNotification;
-    private List<String> myLastFriendsLoc;
+    private ArrayList<String> myLastFriendsLoc;
+    boolean firstTime = true;
 
 
     public ServiceSendMyLoc() {
@@ -81,6 +78,8 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
             createLocationRequest();
             mGoogleApiClient.connect(); // OVO JE OVDE BILO NA DRUGOM SAJTU
         }
+
+        myLastFriendsLoc =  new ArrayList<String>();
     }
 
     @Override
@@ -160,7 +159,8 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
         Log.d("Service: ", "Firing onLocationChanged..............................................");
         mCurrentLocation = location;
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        updateLocation();
+        if (isHaveInternetConnection())
+            updateLocation();
     }
 
     @Override
@@ -258,7 +258,7 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
                     JsonArray jsonArray = new JsonParser().parse(friendsCategories[0]).getAsJsonArray();
                     User user = new User();
 
-                    if (myLastFriendsLoc.size() > 0)
+                    if (myLastFriendsLoc != null && myLastFriendsLoc.size() > 0)
                     {
                         for (int i=0; i < myLastFriendsLoc.size() && i > -1; i++)
                         {
@@ -285,7 +285,7 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
                             // Near Friend
                             //break;
 
-                            if (myLastFriendsLoc.size() > 0)
+                            if (myLastFriendsLoc != null && myLastFriendsLoc.size() > 0)
                             {
                                 if (!myLastFriendsLoc.contains(user.getUsername()))
                                 {
@@ -310,6 +310,20 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
                         showNotification("Near your friend!", "Click to see what friend", R.mipmap.ic_launcher_friends);
                     }
 
+                }
+                else
+                {
+                    if (myLastFriendsLoc != null && myLastFriendsLoc.size() > 0)
+                    {
+                        for (int i=0; i < myLastFriendsLoc.size() && i > -1; i++)
+                        {
+                            if (!friendsCategories[0].contains('"' + myLastFriendsLoc.get(i) + '"'))
+                            {
+                                myLastFriendsLoc.remove(i);
+                                i--;
+                            }
+                        }
+                    }
                 }
 
                 if (friendsCategories[1].contains("Category"))
@@ -340,7 +354,7 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
                             else
                             {
                                 Location.distanceBetween(myLastLocNotification.latitude, myLastLocNotification.longitude, myLoc.latitude, myLoc.longitude, meters);
-                                if (meters[0] > radiusNearLocation)
+                                if (2 * meters[0] > radiusNearLocation) // krug na krug
                                 {
                                     // prikazi notifikaciju
                                     myLastLocNotification = myLoc;
@@ -354,7 +368,7 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
                     }
                 }
             }
-
+            firstTime = false;
         }
 
         @Override
@@ -372,20 +386,40 @@ public class ServiceSendMyLoc extends Service implements LocationListener, Googl
 
     public void showNotification(String title, String text, int icon)
     {
-        NotificationCompat.Builder mBuilder =   new NotificationCompat.Builder(this)
-                .setSmallIcon(icon) // notification icon
-                .setContentTitle(title) // title for notification
-                .setContentText(text) // message for notification
-                .setAutoCancel(true); // clear notification after click
+        if (!firstTime) {
+            NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this)
+                    .setSmallIcon(icon) // notification icon
+                    .setContentTitle(title) // title for notification
+                    .setContentText(text) // message for notification
+                    .setAutoCancel(true); // clear notification after click
 
-        mBuilder.setDefaults(Notification.DEFAULT_ALL);
+            mBuilder.setDefaults(Notification.DEFAULT_ALL);
 
-        Intent intent = new Intent(this, MainActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(this,0,intent,PendingIntent.FLAG_UPDATE_CURRENT);
-        mBuilder.setContentIntent(pi);
-        NotificationManager mNotificationManager =
-                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        mNotificationManager.notify(0, mBuilder.build());
+
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.putExtra("username", myUsername);
+            PendingIntent pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            mBuilder.setContentIntent(pi);
+            NotificationManager mNotificationManager =
+                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            mNotificationManager.notify(0, mBuilder.build());
+        }
+    }
+
+
+    public boolean isHaveInternetConnection() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        boolean NisConnected = activeNetwork != null && activeNetwork.isConnected();
+        if (NisConnected) {
+            if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE || activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
+                return true;
+            } else if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE)
+                return true;
+            else
+                return false;
+        }
+        return false;
     }
 
 }

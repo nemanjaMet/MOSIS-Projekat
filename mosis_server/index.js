@@ -29,6 +29,7 @@ db.serialize(function () {
         "'PhoneNumber' TEXT," +
         "'Image' TEXT," +
         "'Created' TEXT," +
+        "'Team_name' TEXT," +
         "'Points' INTEGER" +
     ");");
 
@@ -86,7 +87,8 @@ app.post('/process_addPoints', urlencodedParser, function (req, res) {
     // Prepare output in JSON format
     response = {
         username: req.body.username,
-        points: req.body.points
+        points: req.body.points,
+        team_name: req.body.team_name
     };
   
         var newPoints = parseInt(response.points);
@@ -111,6 +113,16 @@ app.post('/process_addPoints', urlencodedParser, function (req, res) {
         });
         db.close();
 
+        console.log("Team name 5 points: " + response.team_name);
+        if (response.team_name != null && response.team_name != "")
+        {
+            updateTeamPoints(response.team_name, newPoints, function(result) {
+                //console.log("Result from function: " + result);
+                if (result == "false")
+                    res.send("error")
+            });
+        }
+
         //updateTeamPoints(response.username, response.points);
         console.log("---Points added---");
         //console.log(response);
@@ -126,22 +138,58 @@ app.post('/process_addPoints', urlencodedParser, function (req, res) {
     
 });
 
+
+function updateTeamPoints(teamName, points, callback)
+{
+    console.log("updateTeamPoints");
+    var newPoints = parseInt(points);
+
+        var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+        //db.run("UPDATE TeamPoints SET Points = Points + " + newPoints + "WHERE Username LIKE '%," + response.username + ",%'", new function(err) {
+            db.run("UPDATE TeamPoints SET Points = Points + '" + points + "' WHERE Team_name='" + teamName + "'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                //res.send("error");
+                callback("false");
+                return;
+            }
+        });
+            console.log("TeamPoints is updated");
+            callback("success");
+        });
+        db.close();
+}
+
 app.post('/process_getList', urlencodedParser, function (req, res) {
 
     console.log("Get list...");
     // Prepare output in JSON format
     var response = {
-        fromPosition: req.body.fromPosition
+        fromPosition: req.body.fromPosition,
+        userPoints: req.body.userPoints
     };
 
     var start = parseInt(response.fromPosition);
     var end = start + 10;
     var query = " " + start + "," + end;
 
+    var startQuery = "";
+    if (response.userPoints == "true")
+    {
+        console.log("TRUE: " + response.userPoints);
+        startQuery = "SELECT Username,Points from User ORDER BY Points DESC LIMIT ";
+    }
+    else
+    {
+        console.log("FALSE: " + response.userPoints);
+        startQuery = "SELECT Team_name,Points from TeamPoints ORDER BY Points DESC LIMIT ";
+    }
+
     var db = new sqlite3.Database('projekatDB.db');
     db.serialize(function () {
         //db.all("SELECT * from User where Username='" + response.username + "' and Password='" + response.password + "'", function (err, rows) {
-            db.all("SELECT Username,Points from User ORDER BY Points DESC LIMIT " + query, function (err, rows) {
+            db.all(startQuery + query, function (err, rows) {
 
             //rows contain values while errors, well you can figure out.
             // res.send(JSON.stringify(rows));
@@ -161,25 +209,57 @@ app.post('/process_getList', urlencodedParser, function (req, res) {
 
 });
 
-/*function updateTeamPoints(teamName, points)
-{
-    console.log("updateTeamPoints");
-    var newPoints = parseInt(points);
+app.post('/process_newTeam', urlencodedParser, function (req, res) {
 
-        var db = new sqlite3.Database('projekatDB.db');
-        db.serialize(function () {
-        //db.run("UPDATE TeamPoints SET Points = Points + " + newPoints + "WHERE Username LIKE '%," + response.username + ",%'", new function(err) {
-            db.run("UPDATE TeamPoints SET Points = Points + " + newPoints + "WHERE Team_name='" + teamName + "'", new function(err) {
-             if (err) {
-                console.log(err.message);
-                res.send("error");
-                return;
+    console.log("New team...");
+    // Prepare output in JSON format
+    var response = {
+        team_name: req.body.team_name
+    };
+
+    checkIfTeamExist(response.team_name, function(result) {
+                console.log(result);
+                if (result == "true")
+                {
+                    res.send("otherName");
+                }
+                else
+                {
+                    var db = new sqlite3.Database('projekatDB.db');
+                    db.serialize(function () {
+                        db.run("INSERT into TeamPoints(Team_name,Points) VALUES ('" + response.team_name + "' , '0')", new function(err) {
+                        if (err) {
+                            console.log(err.message);
+                            res.send("error");
+                        }
+                        });
+                    });
+                    db.close();
+                    res.send("success");
+                }
+            });    
+});
+
+function checkIfTeamExist(team_name, callback){
+    var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+            db.all("SELECT Team_name from TeamPoints where Team_name='" + team_name + "'", function (err, rows) {
+            var broj = 0;
+            rows.forEach(function (row) {
+                broj++;
+            });
+
+            if (broj == '1') {
+                callback("true");
             }
-        });
+            else
+                callback("false");
         });
         db.close();
+    });
 }
 
+/*
 function insertTeamNameTeamPoints(teamName)
 {
      console.log("insertFirstTeam");
@@ -338,7 +418,8 @@ app.post('/process_getQuestion', urlencodedParser, function (req, res) {
     console.log("Get questions...");
     // Prepare output in JSON format
     var response = {
-        categoryID: req.body.categoryID
+        categoryID: req.body.categoryID,
+        allUsernames: req.body.allUsernames
     };
 
     var db = new sqlite3.Database('projekatDB.db');
@@ -355,13 +436,40 @@ app.post('/process_getQuestion', urlencodedParser, function (req, res) {
                 res.send(err);
                 return;
             }
-            res.send(JSON.stringify(rows));
+            //res.send(JSON.stringify(rows));
+
+            updateUsersTryToAnswer(response.allUsernames, response.categoryID, function(result) {
+                //console.log("Result from function: " + result);
+                if (result == "success")
+                    res.send(JSON.stringify(rows));
+            });
 
         });
         db.close();
     });
 
 });
+
+function updateUsersTryToAnswer(usernames, categoryID, callback){
+    var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+
+            db.run("UPDATE CategoryQuestions SET UsersTryToAnswer = UsersTryToAnswer || '" + usernames + "' WHERE ID='" + categoryID + "'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                callback("error");
+            }
+             callback("success");
+            });
+            /*db.all(query, function (err, rows) {
+                //console.log(JSON.stringify(rows))
+                     callback(JSON.stringify(rows)) ;
+                });*/
+        });
+        db.close();
+}
+
+
 
 app.post('/process_newuser', urlencodedParser, function (req, res) {
     console.log("Novi podaci...");
@@ -373,23 +481,45 @@ app.post('/process_newuser', urlencodedParser, function (req, res) {
         lastname: req.body.lastname,
         phonenumber: req.body.phonenumber,
         image: req.body.image,
-        created: req.body.created
+        created: req.body.created,
+        update: req.body.update
     };
     
-  
-        var db = new sqlite3.Database('projekatDB.db');
-        db.serialize(function () {
-           // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
-        db.run("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image, Points ,Created) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "','" + "0','" +  response.created + "')", new function(err) {
-             if (err) {
-                console.log(err.message);
-                res.send("userErr");
-                return;
-        }
-        }
-            );
+    var query = "";
+    var userExist = "false";
+    if (response.update == "true")
+    {
+        query = "UPDATE User SET Username = '" + response.username + "',Password='" + response.password + "',Name='" + response.name + "',LastName='" + response.lastname + "',PhoneNumber='" + response.phonenumber + "',Image='" + response.image + "',Created='" + response.created  + "' WHERE Username='" + response.username + "'" ;
+    }
+    else
+    {
+        query = "INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image, Points ,Created) VALUES ('"  + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "','" + "0','" +  response.created + "')";
+        /*checkIfUserExist(response.username, function(result) {
+                console.log("User exist: " + result);
+                if (result === "true")
+                {
+                    userExist = "true";
+                }
+                else
+                {
+                    userExist = "false";
+                }
+            });*/
+    }
+
+        /*if (response.update === "false" && userExist === "false")
+        {*/
+            var db = new sqlite3.Database('projekatDB.db');
+            db.serialize(function () {
+            // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
+            db.run(query, new function(err) {
+                if (err) {
+                    console.log(err.message);
+                    res.send("userErr");
+                    return;
+                }
+            });
         //query.finalize();
-        
         });
         db.close();
 
@@ -402,9 +532,54 @@ app.post('/process_newuser', urlencodedParser, function (req, res) {
         'text/plain': function () {
             res.send('complete');
         }
-        });*/   
-   
-    
+        });*/  
+       /* } 
+        else
+        {
+            res.send("userExist");
+        } */ 
+});
+
+/*function checkIfUserExist(team_name, callback){
+    var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+            db.all("SELECT Username from User where Username='" + response.username + "'", function (err, rows) {
+            var broj = 0;
+            rows.forEach(function (row) {
+                broj++;
+            });
+
+            if (broj === '1') {
+                callback("true");
+            }
+            else
+                callback("false");
+        });
+        db.close();
+    });
+}*/
+
+app.post('/process_checkUsernameExist', urlencodedParser, function (req, res) {
+    response = {
+            username: req.body.username,
+        };
+
+        var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+            db.all("SELECT Username from User where Username='" + response.username + "'", function (err, rows) {
+            var broj = 0;
+            rows.forEach(function (row) {
+                broj++;
+            });
+
+            if (broj == '1') {
+                res.send("true");
+            }
+            else
+                res.send("false");
+        });
+        db.close();
+    });
 });
 
 app.post('/process_checkuser', urlencodedParser, function (req, res) {
@@ -462,13 +637,24 @@ app.post('/process_getFriendProfile', urlencodedParser, function (req, res) {
     console.log("Get friend profile...");
     // Prepare output in JSON format
     var response = {
-        username: req.body.username
+        username: req.body.username,
+        myProfile: req.body.myProfile
     };
+
+    var query = "";
+    if (response.myProfile == "true")
+    {
+        query = "SELECT Username,Password,Name,Lastname,PhoneNumber,Image,Created,Team_name from User where Username='";
+    }
+    else
+    {
+        query = "SELECT Username,Name,Lastname,PhoneNumber,Image,Created,Team_name from User where Username='";
+    }
  
     var db = new sqlite3.Database('projekatDB.db');
     db.serialize(function () {
         //db.all("SELECT * from User where Username='" + response.username + "' and Password='" + response.password + "'", function (err, rows) {
-            db.all("SELECT Username,Name,Lastname,PhoneNumber,Image,Created from User where Username='" + response.username + "'", function (err, rows) {
+            db.all(query + response.username + "'", function (err, rows) {
 
             //rows contain values while errors, well you can figure out.
             // res.send(JSON.stringify(rows));
@@ -599,39 +785,106 @@ app.post('/process_newfriendship', urlencodedParser, function (req, res) {
         username1: req.body.username1,
         username2: req.body.username2
     };
-    
   
-        var db = new sqlite3.Database('projekatDB.db');
-        db.serialize(function () {
-           // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
-        db.run("INSERT into Friendship(Team_name,User1,User2) VALUES ('" + response.team_name + "','" + response.username1 + "','" + response.username2 + "')", new function(err) {
-             if (err) {
-                console.log(err.message);
-                res.send("teamErr");
-                return;
-        }
-        }
-            );
-        //query.finalize();
+isTeamFull(response.team_name, function(result) {
+               if (result == "true")
+               {
+                    res.send("teamFull")
+               }
+               else
+               {
+                    var db = new sqlite3.Database('projekatDB.db');
+                    db.serialize(function () {
+                    // var query = db.prepare("INSERT into User(Username,Password, Name, LastName, PhoneNumber, Image) VALUES ('" + response.username + "','" + response.password + "','" + response.name + "','" + response.lastname + "','" + response.phonenumber +  "','" + response.image + "')");
+                    db.run("INSERT into Friendship(Team_name,User1,User2) VALUES ('" + response.team_name + "','" + response.username1 + "','" + response.username2 + "')", new function(err) {
+                    if (err) {
+                        console.log(err.message);
+                        res.send("teamErr");
+                        return;
+                    }
+                    });
+                    //query.finalize();
         
-        });
-        db.close();
+                    });
+                    db.close();
 
-        console.log("---SEND---");
-        console.log(response);
-        //res.end(JSON.stringify(response));
-        //res.end("complete");
-        res.send("success");
-        /*res.format({
-        'text/plain': function () {
-            res.send('complete');
-        }
-        });*/   
+                    console.log("---NEW Friendship---");
+                    console.log(response);
+                    //res.send("success");
+
+                    //res.end(JSON.stringify(response));
+                    //res.end("complete");
+        
+                    /*res.format({
+                    'text/plain': function () {
+                        res.send('complete');
+                    }
+                    });*/   
    
-    
+                    updateUserTeamName(response.username1, response.username2, response.team_name, function(result) {
+                        console.log("Result from function: " + result);
+                        res.send(result);
+                        });
+                }
+        });    
 });
 
+function updateUserTeamName(user1, user2, teamName, callback){
+    var db = new sqlite3.Database('projekatDB.db');
+        db.serialize(function () {
+        
+        var result = "";
+        db.run("UPDATE User SET Team_name = '" + teamName + "' WHERE Username='" + user1 + "'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                result = "error";
+            }
+             result = "success";
+            });
+
+        if (result == "success")
+        {
+            db.run("UPDATE User SET Team_name = '" + teamName + "' WHERE Username='" + user2 + "'", new function(err) {
+             if (err) {
+                console.log(err.message);
+                callback("error");
+            }
+              callback("success");
+            });
+        }
+        db.close();
+    });
+}
+
+function isTeamFull(teamName, callback){
+     var db = new sqlite3.Database('projekatDB.db');
+    db.serialize(function () {
+            db.all("SELECT Username from User where Team_name='" + teamName + "'", function (err, rows) {
+            var broj = 0;
+            rows.forEach(function (row) {
+                broj++;
+            });
+
+            if (broj >= 5) {
+                callback("true");
+            }
+            else
+                callback("false");
+        });
+        db.close();
+    });
+}
+
+/*var userTestFriend = {
+        Username: "user2",
+        Longitude: "22.12656", // 43.964876
+        Latitude: "43.94762", // 22.143621
+        Created: 16
+    }*/
+
+
 var usersLocations = [];
+//usersLocations.push(userTestFriend);
 //var usersLocations = new Map();
 // update-uje se soptsvena lokacija, i uzimaju se lokacije prijatelja
 app.post('/process_updatelocation', urlencodedParser, function (req, res) {
@@ -642,16 +895,29 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
         friends: req.body.friends, // salje se username prijatelja
         longitude: req.body.longitude,
         latitude: req.body.latitude,
-        queryNearCategory: req.body.queryNearCategory
+        queryNearCategory: req.body.queryNearCategory,
+        userOffline: req.body.userOffline
     };
 
-    console.log(response.queryNearCategory);
+    if (response.userOffline == "true")
+    {
+        userIsOffline(response.username);
+    }
+    else
+    {
+        console.log(response.queryNearCategory);
     //console.log(response);
+
+    var d = new Date();
+    var n = d.getMinutes();
+    //var newPoints = parseInt(response.points);
+    var minuti = n.toString();
 
     var userloc = {
         Username: response.username,
         Longitude: response.longitude,
-        Latitude: response.latitude
+        Latitude: response.latitude,
+        Created: minuti
     }
 
     var friendsloc = [];
@@ -662,11 +928,23 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
             if (usersLocations[i].Username == userloc.Username) {
                  usersLocations[i].Longitude = userloc.Longitude;
                  usersLocations[i].Latitude = userloc.Latitude;
+                 usersLocations[i].Created = userloc.Created;
                  userExist = true;
             } else if (response.friends.includes(usersLocations[i].Username))
             {
-                friendsloc.push(usersLocations[i]);
-                console.log("Push: " + JSON.stringify(usersLocations[i]));
+                var minFriend = parseInt(usersLocations[i].Created);
+                var minMe = parseInt(minuti);
+
+                var difference = Math.abs(minMe - minFriend);
+                if (difference < 2 || difference > 57)
+                {
+                    friendsloc.push(usersLocations[i]);
+                    console.log("Push: " + JSON.stringify(usersLocations[i]));
+                }
+                else
+                {
+                    usersLocations.splice(i, 1);
+                }           
             }
         }
         if (!userExist)
@@ -706,6 +984,7 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
             });
         }
     }
+    }   
 });
 
 
@@ -730,6 +1009,13 @@ function nearCategories(query, callback){
             });
         });
         db.close();
+}
+
+function userIsOffline(username){
+   for (var i = 0; i < usersLocations.length; i++) {
+    if (usersLocations[i].Username == username)
+        usersLocations.splice(i, 1);
+   }
 }
 
 

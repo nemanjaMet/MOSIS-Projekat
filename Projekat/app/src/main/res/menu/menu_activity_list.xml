@@ -16,4 +16,9 @@
         app:showAsAction="never"
         android:title="Previus list">
     </item>
+    <item
+        android:id="@+id/userOrTeam_list"
+        app:showAsAction="never"
+        android:title="Get team list">
+    </item>
 </menu>

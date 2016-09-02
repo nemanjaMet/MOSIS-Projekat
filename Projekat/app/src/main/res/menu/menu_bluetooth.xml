@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/scan_device"
+        android:orderInCategory="100"
+        android:title="Scan device"
+        app:showAsAction="never"
+        />
+
+    <item
+        android:id="@+id/make_me_discoverable"
+        android:orderInCategory="100"
+        android:title="Discoverable"
+        app:showAsAction="never"
+        />
+
+    <item
+        android:id="@+id/secure_connection"
+        android:orderInCategory="100"
+        android:title="Set secure connection (default)"
+        app:showAsAction="never"
+        />
+
+    <item
+        android:id="@+id/insecure_connection"
+        android:orderInCategory="100"
+        android:title="Set insecure connection"
+        app:showAsAction="never"
+        />
+
+
+</menu>

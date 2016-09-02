@@ -5,23 +5,16 @@ import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.support.design.widget.Snackbar;
-import android.support.v4.view.GravityCompat;
-import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.Toolbar;
 import android.text.InputFilter;
 import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import org.apache.http.NameValuePair;
@@ -32,7 +25,8 @@ import java.util.ArrayList;
 
 public class QuestionActivity extends AppCompatActivity {
 
-    private String ipAddress = "http://192.168.0.103:8081";
+    //private String ipAddress = "http:/10.10.3.188:8081";
+    private String ipAddress = MainActivity.publicIpAddress;
 
     private int numberOfQuestion = 5;
     private int questionNumber = 0;
@@ -239,7 +233,7 @@ public class QuestionActivity extends AppCompatActivity {
                 String wrongAnswer3 = (et_wrongAnswer3.getText().toString()).trim();
 
                 if (question.isEmpty() || correctAnswer.isEmpty() || wrongAnswer1.isEmpty() || wrongAnswer2.isEmpty() || wrongAnswer3.isEmpty()) {
-                    Toast.makeText(QuestionActivity.this, "Popunite sva polja!", Toast.LENGTH_LONG).show();
+                    Toast.makeText(QuestionActivity.this, "Fill all fields!!", Toast.LENGTH_LONG).show();
                     return;
                 } else {
                     //questionNumber++;
@@ -281,7 +275,7 @@ public class QuestionActivity extends AppCompatActivity {
             String wrongAnswer3 = (et_wrongAnswer3.getText().toString()).trim();
 
             if (question.isEmpty() || correctAnswer.isEmpty() || wrongAnswer1.isEmpty() || wrongAnswer2.isEmpty() || wrongAnswer3.isEmpty()) {
-                Toast.makeText(QuestionActivity.this, "Popunite sva polja!", Toast.LENGTH_LONG).show();
+                Toast.makeText(QuestionActivity.this, "Fill all fields!", Toast.LENGTH_LONG).show();
                 return;
             }
 

@@ -6,7 +6,6 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
-import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
@@ -31,6 +30,7 @@ public class ProjekatDBAdapter {
     public static final String PHONE_NUMBER = "PhoneNumber";
     public static final String IMAGE = "Image";
     public static final String CREATED = "Created";
+    public static final String TEAM_NAME = "TeamName";
 
     public static final String DATABASE_TABLE2 = "Questions";
     public static final String QUEST_ID = "QuestID";
@@ -75,6 +75,7 @@ public class ProjekatDBAdapter {
         //contentValues.put(IMAGE, getStringImage(user.getImage())); // TREBA ISPRAVITI OVO
         contentValues.put(IMAGE, user.getImage());
         contentValues.put(CREATED, user.getCreated());
+        contentValues.put(TEAM_NAME, user.getTeamName());
         long id = -1;
         db.beginTransaction();
         try {
@@ -154,6 +155,7 @@ public class ProjekatDBAdapter {
                 //user.setImage(StringToBitMap(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.IMAGE))));
                 user.setImage(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.IMAGE)));
                 user.setCreated(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.CREATED)));
+                user.setCreated(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.TEAM_NAME)));
                 users.add(user);
             }
         }
@@ -215,6 +217,31 @@ public class ProjekatDBAdapter {
                 //user.setImage(StringToBitMap(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.IMAGE))));
                 user.setImage(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.IMAGE)));
                 user.setCreated(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.CREATED)));
+                user.setTeamName(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.TEAM_NAME)));
+            }
+        }
+        return user;
+    }
+
+    public User getTeamName(String username) {
+        User user = null;
+        Cursor cursor = null;
+        db.beginTransaction();
+        try {
+            cursor = db.query(DATABASE_TABLE, null, USERNAME + "='" + username + "'", null, null, null, null);
+            db.setTransactionSuccessful();
+        } catch (SQLiteException ec) {
+            Log.v("ProjekatDBAdapter", ec.getMessage());
+        } finally {
+            db.endTransaction();
+        }
+
+        if (cursor != null)
+        {
+            if (cursor.moveToFirst()) {
+                user = new User(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.USERNAME)));
+                user.setID(cursor.getLong(cursor.getColumnIndex(ProjekatDBAdapter.USER_ID)));
+                user.setTeamName(cursor.getString(cursor.getColumnIndex(ProjekatDBAdapter.TEAM_NAME)));
             }
         }
         return user;
@@ -234,6 +261,17 @@ public class ProjekatDBAdapter {
         //contentValues.put(IMAGE, getStringImage(user.getImage())); // TREBA ISPRAVITI OVO
         contentValues.put(IMAGE, user.getImage());
         contentValues.put(CREATED, user.getCreated());
+        //contentValues.put(TEAM_NAME, user.getTeamName());
+
+        return db.update(DATABASE_TABLE, contentValues, where, null);
+    }
+
+    public int updateTeamName(String username, String teamName){
+        String where = USERNAME + "='" + username + "'";
+
+        ContentValues contentValues = new ContentValues();
+
+        contentValues.put(TEAM_NAME, teamName);
 
         return db.update(DATABASE_TABLE, contentValues, where, null);
     }
@@ -330,6 +368,11 @@ public class ProjekatDBAdapter {
             }
         }
         return questions;
+    }
+
+    public void deleteAllData()
+    {
+        dbHelper.deleteDatabase(db);
     }
 
     public void deleteAllQuestions()
