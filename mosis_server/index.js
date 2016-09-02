@@ -902,6 +902,7 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
     if (response.userOffline == "true")
     {
         userIsOffline(response.username);
+        res.send("offline");
     }
     else
     {

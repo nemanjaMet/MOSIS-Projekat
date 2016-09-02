@@ -19,6 +19,10 @@
     <item android:title="Profile">
         <menu>
             <item
+                android:id="@+id/nav_exit_from_team"
+                android:icon="@drawable/ic_exit_from_team"
+                android:title="Exit from team" />
+            <item
                 android:id="@+id/nav_edit_profile"
                 android:icon="@drawable/ic_edit_profile"
                 android:title="Edit profile" />

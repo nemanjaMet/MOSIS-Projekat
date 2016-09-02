@@ -55,6 +55,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
@@ -76,8 +77,8 @@ public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback,  com.google.android.gms.location.LocationListener,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, GoogleMap.OnMarkerClickListener {
 
-    public static String publicIpAddress = "http://192.168.1.73:8081"; // htc wildfire
-    //public static String publicIpAddress = "http://192.168.137.233:8081"; // softUP
+    //public static String publicIpAddress = "http://192.168.1.73:8081"; // htc wildfire
+    public static String publicIpAddress = "http://192.168.137.233:8081"; // softUP
     //public static String publicIpAddress = "http://lookfortheanswer.herokuapp.com";
     private String ipAddress = publicIpAddress;
 
@@ -383,6 +384,7 @@ public class MainActivity extends AppCompatActivity
         super.onDestroy();
         if (!serviceOn)
         {
+            //mAuthTask.cancel(true);
             mAuthTask = null;
             mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, "", "", "true");
             mAuthTask.execute((Void) null);
@@ -437,7 +439,7 @@ public class MainActivity extends AppCompatActivity
                 cancelPostingQuestion();
             } else
             if (isHaveInternetConnection()) {
-                getAllCategoryDeafalut();
+                getAllCategoryDefalut();
             }
 
             return true;
@@ -551,9 +553,9 @@ public class MainActivity extends AppCompatActivity
 
         } else if (id == R.id.nav_logout) {
             serviceOn = false;
-            mAuthTask = null;
+            /*mAuthTask = null;
             mAuthTask = new UpdateLocTask(myUsername, friendsUsernames, "", "", "true");
-            mAuthTask.execute((Void) null);
+            mAuthTask.execute((Void) null);*/
 
             SharedPreferences settings = getApplicationContext().getSharedPreferences(LoginActivity.PREFS_NAME, Context.MODE_PRIVATE);
             settings.edit().clear().commit();
@@ -921,7 +923,7 @@ public class MainActivity extends AppCompatActivity
         protected void onPostExecute(String result) {
             mAuthTask = null;
 
-            if (!result.equals("noFriends") && !result.equals("Error"))
+            if (!result.equals("noFriends") && !result.equals("Error") && !result.equals("offline"))
             {
                 // Update-lokacije prijatelja
                 if (friendsAvatar != null && !friendsAvatar.isEmpty()) // Mozda pukne ako friendsAvatars nije inic.
@@ -989,7 +991,7 @@ public class MainActivity extends AppCompatActivity
                     Toast.makeText(MainActivity.this, "Error on update location and communication with server! Check internet connection! ", Toast.LENGTH_LONG).show();
 
                 }
-                else if (friendsMarkers != null && friendsMarkers.size() > 0)
+                else if (friendsMarkers != null && friendsMarkers.size() > 0 && !result.equals("offline"))
                 {
                     friendsMarkers.clear();
                     mMap.clear();
@@ -1474,7 +1476,7 @@ public class MainActivity extends AppCompatActivity
                     mCategoryTask.execute();*/
 
                     if (isHaveInternetConnection()) {
-                        getAllCategoryDeafalut();
+                        getAllCategoryDefalut();
                     }
                 }
             }
@@ -1628,12 +1630,12 @@ public class MainActivity extends AppCompatActivity
 
                         final String category = questionsCategory.getCategory();
                         final String userCreated = questionsCategory.getCreatedUser();
-                        Bitmap resizedIcon = getCategoryMarker(category);
+                        //Bitmap resizedIcon = getCategoryMarker(category);
                         Marker markerCategory = mMap.addMarker(new MarkerOptions()
                                 .position(categoryLatLng)
                                 .title(questionsCategory.getID())
                                 .snippet("Category: " + category + "\n" + "Created by " + userCreated)
-                                .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                                .icon(getCategoryMarker(category)));
                         categoryMarkers.add(markerCategory);
 
                         mMap.setOnMarkerClickListener(MainActivity.this);
@@ -1706,13 +1708,13 @@ public class MainActivity extends AppCompatActivity
                 /*Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
                 Bitmap resizedIcon = Bitmap.createScaledBitmap(icon, 75, 75, false);*/
 
-                Bitmap resizedIcon = getCategoryMarker(marker.getSnippet());
+                //Bitmap resizedIcon = getCategoryMarker(marker.getSnippet());
 
                 Marker markerCategory = mMap.addMarker(new MarkerOptions()
                         .position(marker.getPosition())
                         .title(marker.getTitle())
                         .snippet(marker.getSnippet())
-                        .icon(BitmapDescriptorFactory.fromBitmap(resizedIcon)));
+                        .icon(getCategoryMarker(marker.getSnippet())));
 
                 categoryMarkers.set(i, markerCategory);
 
@@ -1851,7 +1853,7 @@ public class MainActivity extends AppCompatActivity
                         if (correctAnswered > -1)
                         {
                             if (isHaveInternetConnection()) {
-                                getAllCategoryDeafalut();
+                                getAllCategoryDefalut();
                             }
                             correctAnswered = -1;
                         }
@@ -1867,14 +1869,14 @@ public class MainActivity extends AppCompatActivity
                 }).show();
     }
 
-    public Bitmap getCategoryMarker(String category)
+    public BitmapDescriptor getCategoryMarker(String category)
     {
 
         Bitmap marker = null;
 
         if (category.contains("Culture"))
         {
-            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.culture);
             marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
         }
         else if (category.contains("Cuisine"))
@@ -1884,24 +1886,25 @@ public class MainActivity extends AppCompatActivity
         }
         else if (category.contains("Geography"))
         {
-            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.geography);
             marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
         }
         else if (category.contains("History"))
         {
-            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_question_marker);
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.hisrory);
             marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
         }
         else if (category.contains("Sport"))
         {
-            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_category_sport);
+            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.sport);
             marker = Bitmap.createScaledBitmap(icon, 75, 75, false);
         }
 
-        return  marker;
+        //return  marker;
+        return BitmapDescriptorFactory.fromBitmap(getMarkerBitmapFromView(mCustomMarkerView, marker));
     }
 
-    private void getAllCategoryDeafalut()
+    private void getAllCategoryDefalut()
     {
         if (getCategoryTask == null) {
 
