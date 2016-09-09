@@ -69,15 +69,25 @@ var urlencodedParser = bodyParser.urlencoded({ extended: false })
 
 app.post('/process_deleteuser', urlencodedParser, function(req, res){
     var response = {
-        username: req.body.username
+        username: req.body.username,
+        exitFromTeam: req.body.exitFromTeam
     };
 
     var db = new sqlite3.Database('projekatDB.db');
     db.serialize(function(){
 /////////prva funkcija treba da vidi u tabeli friendship da li je ovaj username prijatelj nekom drugom i da ga izbrise, a druga brise samog korisnika!!!!////////////
-        db.run("DELETE from Friendship where User1= '"+ response.username + "'" + "|| User2='"+ response.username + "'");
-        db.run("DELETE from User where Username = '"+ response.username + "'");
-        res.send("success");
+        db.run("DELETE from Friendship where User1= '"+ response.username + "'" + " OR User2='"+ response.username + "'");
+        if (response.exitFromTeam == "true")
+        {
+                db.run("UPDATE User SET Team_name = '" + "" + "' WHERE Username='" + response.username + "'");
+                res.send("exitFromTeam");
+        }
+        else
+        {
+            db.run("DELETE from User where Username = '"+ response.username + "'");
+            res.send("success");
+        }        
+        
     });
      db.close();
 });
@@ -899,6 +909,8 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
         userOffline: req.body.userOffline
     };
 
+    console.log("Update location " + response.username + " -> Lat: " + response.latitude + " Lon: " + response.longitude);
+
     if (response.userOffline == "true")
     {
         userIsOffline(response.username);
@@ -906,8 +918,8 @@ app.post('/process_updatelocation', urlencodedParser, function (req, res) {
     }
     else
     {
-        console.log(response.queryNearCategory);
-    //console.log(response);
+
+    //console.log(response.queryNearCategory);
 
     var d = new Date();
     var n = d.getMinutes();

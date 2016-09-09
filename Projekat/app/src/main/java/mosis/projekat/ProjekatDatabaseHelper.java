@@ -68,6 +68,16 @@ public class ProjekatDatabaseHelper extends SQLiteOpenHelper {
     }
     }
 
+    public void deleteUserDatabase(SQLiteDatabase db)
+    {
+        try {
+            db.execSQL("DROP TABLE IF EXISTS " + ProjekatDBAdapter.DATABASE_TABLE);
+            db.execSQL(DATABASE_CREATE);
+        } catch (SQLiteException ec){
+            Log.v("ProjekatDatabaseHelper", ec.getMessage());
+        }
+    }
+
     public void dropCreateQuestions(SQLiteDatabase db)
     {
         try {

@@ -375,6 +375,8 @@ public class ProjekatDBAdapter {
         dbHelper.deleteDatabase(db);
     }
 
+    public void deleteAllUsers() {dbHelper.deleteUserDatabase(db);}
+
     public void deleteAllQuestions()
     {
         //db.delete(DATABASE_TABLE2,null,null);

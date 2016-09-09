@@ -11,6 +11,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.InputFilter;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -53,6 +54,10 @@ public class QuestionActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_question);
+
+        android.support.v7.app.ActionBar actionBar = getSupportActionBar();
+        actionBar.setHomeButtonEnabled(true);
+        actionBar.setDisplayHomeAsUpEnabled(true);
 
         et_question = (EditText)findViewById(R.id.question);
         et_correctAnswer = (EditText)findViewById(R.id.correct_answer);
@@ -453,4 +458,22 @@ public class QuestionActivity extends AppCompatActivity {
             showProgress(false);
         }
     }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        int id = item.getItemId();
+
+        if (id == android.R.id.home)
+        {
+            Intent returnIntent = new Intent(QuestionActivity.this, MainActivity.class);
+            setResult(RESULT_CANCELED, returnIntent);
+            finish();
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
 }

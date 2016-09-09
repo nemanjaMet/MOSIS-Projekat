@@ -133,6 +133,11 @@ public class ActivityList extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        android.support.v7.app.ActionBar actionBar = getSupportActionBar();
+        actionBar.setHomeButtonEnabled(true);
+        actionBar.setDisplayHomeAsUpEnabled(true);
+        //getActionBar().setDisplayHomeAsUpEnabled(true);
+
         Intent intent = getIntent();
         myUsername = intent.getStringExtra("myUsername");
 
@@ -355,6 +360,13 @@ public class ActivityList extends AppCompatActivity {
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
+
+        if (id == android.R.id.home)
+        {
+            Intent returnIntent = new Intent(ActivityList.this, MainActivity.class);
+            setResult(RESULT_CANCELED, returnIntent);
+            finish();
+        }
 
         //noinspection SimplifiableIfStatement
         if (!bluetoothActivity) {

@@ -78,8 +78,8 @@ public class MainActivity extends AppCompatActivity
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, GoogleMap.OnMarkerClickListener {
 
     //public static String publicIpAddress = "http://192.168.1.73:8081"; // htc wildfire
-    public static String publicIpAddress = "http://192.168.137.233:8081"; // softUP
-    //public static String publicIpAddress = "http://lookfortheanswer.herokuapp.com";
+    //public static String publicIpAddress = "http://192.168.137.233:8081"; // softUP
+    public static String publicIpAddress = "http://lookfortheanswer.herokuapp.com";
     private String ipAddress = publicIpAddress;
 
     //private String ipAddress = "http://10.10.3.188:8081";
@@ -539,7 +539,7 @@ public class MainActivity extends AppCompatActivity
                         public void onClick(DialogInterface dialog, int which)
                         {
                             DeleteProfileTask deleteMe;
-                            deleteMe = new DeleteProfileTask(myUsername);
+                            deleteMe = new DeleteProfileTask(myUsername, "false");
                             deleteMe.execute();
                         }
                     })
@@ -566,6 +566,31 @@ public class MainActivity extends AppCompatActivity
             dbAdapter.open();
             dbAdapter.deleteAllData();
             dbAdapter.close();
+        }
+        else if (id == R.id.nav_exit_from_team)
+        {
+            if (friendsUsernames != null && !TextUtils.isEmpty(friendsUsernames)) {
+                AlertDialog builder = new AlertDialog.Builder(MainActivity.this)
+                        .setMessage("\n\nAre you shure you want to exit from team ?")
+                        .setCancelable(false)
+                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                DeleteProfileTask deleteMe;
+                                deleteMe = new DeleteProfileTask(myUsername, "true");
+                                deleteMe.execute();
+                            }
+                        })
+                        .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                // Perform Your Task Here--When No is pressed
+                                dialog.cancel();
+                            }
+                        }).show();
+            }
+            else
+            {
+                Toast.makeText(getApplicationContext(), "You don't have team, you are single! :D", Toast.LENGTH_SHORT).show();
+            }
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
@@ -1750,15 +1775,18 @@ public class MainActivity extends AppCompatActivity
    public class DeleteProfileTask extends AsyncTask<Void, Void, String> {
 
         private final String mUsername;
+        private final String mExitFromTeam;
 
-        DeleteProfileTask(String username) {
+        DeleteProfileTask(String username, String exitFromTeam) {
             mUsername = username;
+            mExitFromTeam = exitFromTeam;
         }
 
         protected String doInBackground(Void... params) {
             // TODO: attempt authentication against a network service.
             ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
             postParameters.add(new BasicNameValuePair("username", mUsername ));
+            postParameters.add(new BasicNameValuePair("exitFromTeam", mExitFromTeam ));
             String resDeletedProfile = null;
             try {
                 resDeletedProfile = CustomHttpClient.executeHttpPost(ipAddress + "/process_deleteuser", postParameters);
@@ -1794,6 +1822,26 @@ public class MainActivity extends AppCompatActivity
                 dbAdapter.open();
                 dbAdapter.deleteAllData();
                 dbAdapter.close();
+            }
+            else if (result.equals("exitFromTeam"))
+            {
+                dbAdapter.open();
+                User user = dbAdapter.getEntry(myUsername);
+                user.setTeamName("");
+                dbAdapter.deleteAllUsers();
+                dbAdapter.insertEntry(user);
+                dbAdapter.close();
+
+                friendsUsernames = "";
+                if (friendsMarkers != null)
+                    friendsMarkers.clear();
+                if (friendsAvatar != null)
+                    friendsAvatar.clear();
+                mMap.clear();
+                addMarkersAfterClearMap();
+                updateNavbarUserData();
+
+                Toast.makeText(getApplicationContext(), "You are not in team anymore!", Toast.LENGTH_SHORT).show();
             }
             else
             {
